@@ -1,45 +1,43 @@
--- Tabelas da coleta: criadas sozinhas na primeira execução (Postgres ou SQLite).
+-- Tabelas da coleta. Mesmo formato das tabelas que já existem no seu banco Neon:
+-- se elas já existem, nada muda. Num banco novo (ou no SQLite local) são criadas aqui.
 CREATE TABLE IF NOT EXISTS ceasa (
-    id   TEXT PRIMARY KEY,
-    nome TEXT NOT NULL,
-    uf   TEXT
+    id     TEXT PRIMARY KEY,
+    nome   TEXT NOT NULL,
+    uf     TEXT,
+    ativo  BOOLEAN NOT NULL DEFAULT TRUE
 );
 
--- um registro por CEASA e dia de boletim
 CREATE TABLE IF NOT EXISTS boletim (
-    ceasa        TEXT NOT NULL,
-    data         TEXT NOT NULL,              -- AAAA-MM-DD
-    status       TEXT NOT NULL,              -- ok | sem_dados | erro
-    hash         TEXT,
+    ceasa_id     TEXT NOT NULL,
+    data         DATE NOT NULL,
+    status       TEXT NOT NULL,
+    pdf_sha256   TEXT,
     erro         TEXT,
-    normalizado  INTEGER NOT NULL DEFAULT 0, -- 0 = linhas brutas ainda por normalizar
-    atualizado   TEXT NOT NULL,
-    PRIMARY KEY (ceasa, data)
+    tentativas   INTEGER NOT NULL DEFAULT 0,
+    normalizado  BOOLEAN NOT NULL DEFAULT FALSE,
+    coletado_em  TIMESTAMP WITH TIME ZONE,
+    PRIMARY KEY (ceasa_id, data)
 );
 
--- linhas exatamente como vieram do site (permite reprocessar sem baixar de novo)
 CREATE TABLE IF NOT EXISTS linha_bruta (
-    ceasa   TEXT NOT NULL,
-    data    TEXT NOT NULL,
-    ordem   INTEGER NOT NULL,
-    pagina  INTEGER,
-    metodo  TEXT,
-    celulas TEXT NOT NULL,                   -- lista JSON de células
-    PRIMARY KEY (ceasa, data, ordem)
+    ceasa_id  TEXT NOT NULL,
+    data      DATE NOT NULL,
+    pagina    INTEGER,
+    ordem     INTEGER NOT NULL,
+    metodo    TEXT,
+    celulas   TEXT NOT NULL,
+    PRIMARY KEY (ceasa_id, data, ordem)
 );
 
--- cotações padronizadas; só 'validado' vai para o app
 CREATE TABLE IF NOT EXISTS cotacao (
-    ceasa        TEXT NOT NULL,
-    data         TEXT NOT NULL,
-    ordem        INTEGER NOT NULL,
+    ceasa_id     TEXT NOT NULL,
+    data         DATE NOT NULL,
     produto      TEXT NOT NULL,
     detalhe      TEXT NOT NULL,
     embalagem    TEXT NOT NULL,
-    minimo       DOUBLE PRECISION,
-    comum        DOUBLE PRECISION NOT NULL,
-    maximo       DOUBLE PRECISION,
+    minimo       NUMERIC,
+    comum        NUMERIC NOT NULL,
+    maximo       NUMERIC,
     situacao     TEXT,
-    conferencia  TEXT NOT NULL,
-    PRIMARY KEY (ceasa, data, ordem)
+    conferencia  TEXT NOT NULL
 );

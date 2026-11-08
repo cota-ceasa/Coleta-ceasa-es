@@ -66,7 +66,11 @@ def normalizar(conn, c):
     pend = db.pendentes_normalizacao(conn, c.id)
     n = 0
     for d in pend:
-        cots = c.normalizar(db.linhas(conn, c.id, d), d)
+        brutas = db.linhas(conn, c.id, d)
+        if not brutas:  # boletim antigo sem linhas guardadas: mantém as cotações que já existem
+            print(f"[{c.id}] {d}: sem linhas brutas guardadas, cotações existentes mantidas")
+            continue
+        cots = c.normalizar(brutas, d)
         if cots is None:
             print(f"[{c.id}] parser ainda não implementado: {len(pend)} boletins aguardando normalização")
             return
