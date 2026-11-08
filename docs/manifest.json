@@ -1,0 +1,22 @@
+{
+  "short_name": "COTA CEA$A",
+  "name": "COTA CEA$A - Preços CEASA",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#05120b",
+  "theme_color": "#0a1f13",
+  "display": "standalone",
+  "lang": "pt-BR",
+  "scope": "./"
+}

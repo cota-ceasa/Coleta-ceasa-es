@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COTA CEA$A - Preços CEASA</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="theme-color" content="#0a1f13">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        // Verde e amarelo da bandeira do Brasil
+                        verde:  { DEFAULT: '#12B24A', claro: '#3BD777', escuro: '#0B8A3B' },
+                        ouro:   { DEFAULT: '#FCFC30', escuro: '#E6E61F' },
+                        // Fundos escuros com um leve tom de verde
+                        mata:   { 950: '#05120b', 900: '#0a1f13', 800: '#12301e', 700: '#1c4630' }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-black text-slate-100 min-h-screen font-sans antialiased">
+<!-- Moldura de celular: o app sempre usa a largura de uma tela de celular, mesmo no PC -->
+<div id="app" class="w-full max-w-md mx-auto min-h-screen flex flex-col bg-mata-950 border-x border-mata-800 shadow-2xl shadow-black">
+
+    <!-- Header principal -->
+    <header class="bg-mata-900 sticky top-0 z-30 shadow-md">
+        <div class="px-4 h-16 flex items-center justify-between">
+            <!-- Logo: losango + círculo da bandeira, com o cifrão como marca -->
+            <div class="flex items-center space-x-2.5 min-w-0">
+                <svg viewBox="0 0 48 48" class="w-10 h-10 shrink-0" role="img" aria-label="Logo COTA CEA$A">
+                    <rect width="48" height="48" rx="12" fill="#FCFC30"/>
+                    <path d="M9 33 L18 23 L25 29 L37 14" fill="none" stroke="#0B8A3B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M28 13.5 H37.5 V23" fill="none" stroke="#0B8A3B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <div class="min-w-0">
+                    <h1 class="text-[24px] font-black tracking-tight leading-none text-verde-claro whitespace-nowrap">COTA CEA<span class="text-ouro">$</span>A</h1>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <button onclick="abrirModalAuth('login')" id="btn-conta" title="Entrar" class="bg-ouro hover:bg-ouro-escuro text-mata-950 font-semibold w-10 h-10 rounded-xl text-sm transition-colors duration-200 flex items-center justify-center shadow-sm">
+                    <i class="fa-solid fa-user"></i>
+                </button>
+
+                <!-- Favoritos: estrela vazada (inativo) / preenchida (filtro ligado) -->
+                <button onclick="toggleFiltroFavoritos()" id="btn-fav-header" title="Meus Favoritos" aria-pressed="false" class="bg-mata-800 hover:bg-mata-700 border border-mata-700 text-ouro p-2.5 rounded-xl transition-all duration-200 flex items-center justify-center relative">
+                    <svg id="ico-fav-header" viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2.5l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 17.5l-5.9 3.2 1.2-6.6L2.5 9.5l6.6-.9z"/></svg>
+                    <span id="fav-count-badge" class="absolute -top-1 -right-1 bg-ouro text-mata-950 text-[10px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center">0</span>
+                </button>
+            </div>
+        </div>
+        <!-- Filete amarelo -->
+        <div class="h-1 bg-ouro"></div>
+    </header>
+
+    <!-- Conteúdo Principal -->
+    <main class="flex-1 w-full px-4 py-4">
+        <section id="vista-lista" class="space-y-4">
+        <div class="flex flex-col items-stretch gap-3">
+            <!-- Grupo de produtos e localidade: lado a lado, mesmo estilo -->
+            <div class="grid grid-cols-2 gap-3">
+                <div class="relative">
+                    <select id="select-categoria" aria-label="Grupo de produtos" onchange="filtrarCategoria(this.value)" class="w-full appearance-none bg-mata-800 text-slate-200 text-sm font-medium rounded-xl border border-mata-700 pl-3.5 pr-9 py-2.5 focus:ring-2 focus:ring-ouro focus:outline-none cursor-pointer truncate">
+                        <option value="todos">📦 Tipos de produtos</option>
+                        <option value="frutas">🍎 Frutas</option>
+                        <option value="folhosas">🥬 Folhosas</option>
+                        <option value="legumes">🍅 Legumes</option>
+                        <option value="raizes">🥔 Raízes e tubérculos</option>
+                        <option value="temperos">🌿 Temperos</option>
+                        <option value="ovos_graos">🥚 Ovos e grãos</option>
+                        <option value="pescados">🐟 Pescados</option>
+                        <option value="outros">🧺 Outros</option>
+                    </select>
+                    <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-ouro text-xs pointer-events-none"></i>
+                </div>
+
+                <div class="relative">
+                    <select id="select-mercado" aria-label="Localidade" onchange="alterarMercado(this.value)" class="w-full appearance-none bg-mata-800 text-slate-200 text-sm font-medium rounded-xl border border-mata-700 pl-3.5 pr-9 py-2.5 focus:ring-2 focus:ring-ouro focus:outline-none cursor-pointer truncate">
+                        <option value="ES">📍 CEASA - Vitória (ES)</option>
+                        <option value="SP">📍 CEASA - São Paulo (SP)</option>
+                        <option value="MG">📍 CEASA - Belo Horizonte (MG)</option>
+                    </select>
+                    <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-ouro text-xs pointer-events-none"></i>
+                </div>
+            </div>
+
+            <div class="relative flex-1">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-ouro text-sm"></i>
+                <input type="search" id="input-busca" oninput="filtrarProdutos()" placeholder="Buscar por produto (ex: Tomate, Batata...)" autocomplete="off" class="w-full bg-mata-950 border border-mata-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-ouro">
+            </div>
+        </div>
+
+        <!-- Faixa de informação: data do boletim, contagem e filtro de favoritos -->
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 px-1">
+            <span id="info-boletim"><i class="fa-regular fa-calendar mr-1 text-ouro"></i>Carregando cotações…</span>
+            <div class="flex items-center gap-3">
+                <button id="chip-fav" onclick="limparFiltros()" class="hidden items-center gap-1.5 bg-ouro/10 text-ouro border border-ouro/30 rounded-full px-2.5 py-1 font-semibold hover:bg-ouro/20 transition-colors">
+                    <i class="fa-solid fa-star"></i> Só favoritos <i class="fa-solid fa-xmark ml-0.5"></i>
+                </button>
+                <span id="info-contagem"></span>
+            </div>
+        </div>
+
+        <div id="grid-produtos" class="grid grid-cols-1 gap-2"></div>
+        <div id="estado-vazio" class="hidden text-center py-16 text-slate-400"></div>
+        </section>
+
+        <!-- Detalhe do produto: histórico no tempo, gráfico e previsão -->
+        <section id="vista-detalhe" class="hidden space-y-4"></section>
+    </main>
+
+    <!-- Folha sobreposta: login e configurações -->
+    <div id="folha" class="hidden fixed inset-0 z-50 bg-black/70" role="dialog" aria-modal="true">
+        <div id="folha-conteudo" class="relative mx-auto w-full max-w-md h-full bg-mata-950 border-x border-mata-800 overflow-y-auto"></div>
+    </div>
+
+    <footer class="bg-mata-900 border-t border-mata-800 py-5 px-4 text-center text-xs text-slate-500">
+        <p>&copy; 2026 COTA CEA<span class="text-ouro">$</span>A • Preços consolidados CEASA para produtores, feirantes e comerciantes.</p>
+    </footer>
+
+    <!-- Banner de patrocínio: fixo na parte inferior da tela -->
+    <div class="sticky bottom-0 z-30 bg-ouro text-mata-950 text-xs font-semibold py-2.5 px-4 shadow-[0_-4px_12px_rgba(0,0,0,0.4)]">
+        <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2 min-w-0">
+                <span class="bg-verde text-white text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded shrink-0">Patrocinado</span>
+                <span class="leading-tight">Insumos Agrícolas &amp; Adubos – descontos para feirantes e produtores!</span>
+            </div>
+            <a href="#" class="inline-flex items-center gap-1 font-bold underline hover:opacity-80 transition-opacity whitespace-nowrap shrink-0">
+                <span>Ofertas</span>
+                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+            </a>
+        </div>
+    </div>
+
+    <script src="util.js"></script>
+    <script src="grafico.js"></script>
+    <script src="auth.js"></script>
+    <script src="app.js"></script>
+</div>
+</body>
+</html>
