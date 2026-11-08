@@ -1,0 +1,93 @@
+name: Coleta CEASA
+
+on:
+  schedule:
+    - cron: "07 05 * * *"
+    - cron: "06 06 * * *"
+  workflow_dispatch:
+    inputs:
+      discover:
+        description: "Inspecionar o formulário de uma CEASA (ex.: ES) em vez de coletar"
+        required: false
+        default: ""
+      inicio:
+        description: "Coletar a partir desta data (AAAA-MM-DD). Vazio = últimos 30 dias"
+        required: false
+        default: ""
+      max:
+        description: "Máximo de boletins novos por CEASA nesta execução"
+        required: false
+        default: "60"
+      renormalizar:
+        description: "Refazer a padronização dos boletins já baixados (sem baixar de novo)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: coleta
+  cancel-in-progress: false
+
+jobs:
+  coleta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Inspecionar formulário (opcional)
+        if: ${{ inputs.discover != '' }}
+        run: python -m coleta.run --discover "${{ inputs.discover }}"
+
+      - name: Coletar boletins
+        if: ${{ inputs.discover == '' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          INICIO: ${{ inputs.inicio }}
+          MAXIMO: ${{ inputs.max }}
+          RENORMALIZAR: ${{ inputs.renormalizar }}
+        run: |
+          ARGS="--max ${MAXIMO:-40}"
+          if [ -n "$INICIO" ]; then ARGS="$ARGS --inicio $INICIO"; fi
+          if [ "$RENORMALIZAR" = "true" ]; then ARGS="$ARGS --renormalizar"; fi
+          if [ "${{ github.event_name }}" = "schedule" ]; then ARGS="$ARGS --parar-as 20:45"; fi
+          python -m coleta.run $ARGS
+
+      - name: Guardar boletins brutos e diagnósticos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: saida
+          path: saida/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Publicar app (GitHub Pages)
+        if: ${{ inputs.discover == '' }}
+        uses: actions/configure-pages@v5
+
+      - if: ${{ inputs.discover == '' }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - id: deploy
+        if: ${{ inputs.discover == '' }}
+        uses: actions/deploy-pages@v4
