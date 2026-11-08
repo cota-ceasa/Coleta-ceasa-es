@@ -2,8 +2,9 @@ name: Coleta CEASA
 
 on:
   schedule:
-    - cron: "07 05 * * *"
-    - cron: "06 06 * * *"
+    # seg-sáb, 12:17 e 18:47 de Brasília (UTC-3)
+    - cron: "17 15 * * 1-6"
+    - cron: "47 21 * * 1-6"
   workflow_dispatch:
     inputs:
       discover:
@@ -47,10 +48,27 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Instalar dependências
+      - name: Instalar dependências Python
+        run: pip install -r requirements.txt
+
+      - name: Versão do Playwright
+        id: pwv
+        run: echo "v=$(python -c 'import importlib.metadata as m;print(m.version("playwright"))')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache do navegador
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pwv.outputs.v }}
+
+      - name: Instalar navegador
         run: |
-          pip install -r requirements.txt
-          python -m playwright install --with-deps chromium
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            python -m playwright install-deps chromium
+          else
+            python -m playwright install --with-deps chromium
+          fi
 
       - name: Inspecionar formulário (opcional)
         if: ${{ inputs.discover != '' }}
@@ -67,6 +85,7 @@ jobs:
           ARGS="--max ${MAXIMO:-40}"
           if [ -n "$INICIO" ]; then ARGS="$ARGS --inicio $INICIO"; fi
           if [ "$RENORMALIZAR" = "true" ]; then ARGS="$ARGS --renormalizar"; fi
+          # nas execuções agendadas, não começa novos downloads depois das 20:45 (o site sai do ar à noite)
           if [ "${{ github.event_name }}" = "schedule" ]; then ARGS="$ARGS --parar-as 20:45"; fi
           python -m coleta.run $ARGS
 
