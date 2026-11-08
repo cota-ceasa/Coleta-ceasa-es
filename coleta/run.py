@@ -19,25 +19,13 @@ BRT = dt.timezone(dt.timedelta(hours=-3))  # Brasília (sem horário de verão)
 SAIDA = Path("saida")  # boletins brutos e diagnósticos (vira artefato no GitHub Actions)
 
 
-def hora_limite(txt):
-    """'20:45' -> datetime de hoje nesse horário (Brasília); None = sem limite."""
-    if not txt:
-        return None
-    h, m = map(int, txt.split(":"))
-    agora = dt.datetime.now(BRT)
-    return agora.replace(hour=h, minute=m, second=0, microsecond=0)
-
-
-def coletar(c, page, conn, inicio, fim, maximo, limite=None):
+def coletar(c, page, conn, inicio, fim, maximo):
     feitas = db.datas_resolvidas(conn, c.id)
     pend = [(d, ref) for d, ref in c.datas(page) if inicio <= d <= fim and d not in feitas]
     print(f"[{c.id}] {len(pend)} boletins pendentes ({inicio} a {fim}); "
           f"baixando até {min(maximo, len(pend))} nesta execução")
     seguidos = 0
     for d, ref in pend[:maximo]:
-        if limite and dt.datetime.now(BRT) >= limite:
-            print(f"[{c.id}] parando: passou de {limite:%H:%M} (o site sai do ar à noite). Continua na próxima.")
-            break
         try:
             res = c.capturar(page, ref)
             seguidos = 0
@@ -87,7 +75,6 @@ def main():
     ap.add_argument("--max", type=int, default=40, help="máx. boletins novos por CEASA nesta execução")
     ap.add_argument("--json", default="docs/dados.json", help="arquivo de saída do app")
     ap.add_argument("--discover", metavar="ID", help="inspeciona o formulário de uma CEASA e sai")
-    ap.add_argument("--parar-as", metavar="HH:MM", help="não começa novos downloads depois desse horário (Brasília)")
     ap.add_argument("--renormalizar", action="store_true", help="refaz a padronização de todos os boletins já baixados (sem baixar de novo)")
     ap.add_argument("--headed", action="store_true", help="mostra o navegador (uso local)")
     a = ap.parse_args()
@@ -108,7 +95,6 @@ def main():
         raise SystemExit(f"CEASA sem coletor: {desconhecidas}. Disponíveis: {list(REGISTRO)}")
     alvo = [REGISTRO[i] for i in ids]
     hoje = dt.datetime.now(BRT).date()
-    limite = hora_limite(a.parar_as)
     inicio = dt.date.fromisoformat(a.inicio) if a.inicio else hoje - dt.timedelta(days=30)
 
     conn = db.conectar()
@@ -122,7 +108,7 @@ def main():
         for c in ([] if a.renormalizar else alvo):  # uma CEASA com problema não derruba as outras
             ctx = browser.new_context(accept_downloads=True, ignore_https_errors=True)  # o site usa certificado de IP
             try:
-                coletar(c, ctx.new_page(), conn, inicio, hoje, a.max, limite)
+                coletar(c, ctx.new_page(), conn, inicio, hoje, a.max)
             except Exception as e:  # noqa: BLE001
                 falhas += 1
                 print(f"[{c.id}] FALHOU: {e}")
