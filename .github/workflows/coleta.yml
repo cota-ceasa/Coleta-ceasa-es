@@ -85,8 +85,6 @@ jobs:
           ARGS="--max ${MAXIMO:-40}"
           if [ -n "$INICIO" ]; then ARGS="$ARGS --inicio $INICIO"; fi
           if [ "$RENORMALIZAR" = "true" ]; then ARGS="$ARGS --renormalizar"; fi
-          # nas execuções agendadas, não começa novos downloads depois das 20:45 (o site sai do ar à noite)
-          if [ "${{ github.event_name }}" = "schedule" ]; then ARGS="$ARGS --parar-as 20:45"; fi
           python -m coleta.run $ARGS
 
       - name: Guardar boletins brutos e diagnósticos
