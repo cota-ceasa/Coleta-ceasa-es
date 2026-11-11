@@ -8,7 +8,7 @@ import time
 import urllib.request
 from urllib.parse import urlparse
 
-from .ceasas.mg import URL_MG
+URL_MG = "https://minas1.ceasa.mg.gov.br/detec/filtro_boletim/filtro_boletim_mob.php"  # independente do coletor MG
 
 ALVOS = [
     ("MG formulário (mobile)", URL_MG),
