@@ -8,15 +8,24 @@ on:
   workflow_dispatch:
     inputs:
       discover:
-        description: "Inspecionar o formulário de uma CEASA (ex.: ES) em vez de coletar"
+        description: "Inspecionar o formulário de uma CEASA (ex.: ES ou BH) em vez de coletar"
         required: false
         default: ""
+      diagnostico:
+        description: "Só testar se o GitHub consegue abrir os sites das CEASAs (computador x Android)"
+        type: boolean
+        default: false
+      perfil:
+        description: "Navegador simulado na coleta"
+        type: choice
+        options: [computador, android]
+        default: computador
       inicio:
         description: "Coletar a partir desta data (AAAA-MM-DD). Vazio = últimos 30 dias"
         required: false
         default: ""
       max:
-        description: "Máximo de boletins novos por CEASA nesta execução"
+        description: "Máximo de boletins novos POR CEASA nesta execução (são 8 CEASAs: use 40 ao carregar histórico)"
         required: false
         default: "60"
       renormalizar:
@@ -70,19 +79,25 @@ jobs:
             python -m playwright install --with-deps chromium
           fi
 
+      - name: Diagnóstico de acesso (opcional)
+        if: ${{ inputs.diagnostico }}
+        run: python -m coleta.run --diagnostico
+
       - name: Inspecionar formulário (opcional)
-        if: ${{ inputs.discover != '' }}
-        run: python -m coleta.run --discover "${{ inputs.discover }}"
+        if: ${{ inputs.discover != '' && !inputs.diagnostico }}
+        run: python -m coleta.run --discover "${{ inputs.discover }}" --perfil "${{ inputs.perfil || 'computador' }}"
 
       - name: Coletar boletins
-        if: ${{ inputs.discover == '' }}
+        if: ${{ inputs.discover == '' && !inputs.diagnostico }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PYTHONUNBUFFERED: "1"
           INICIO: ${{ inputs.inicio }}
           MAXIMO: ${{ inputs.max }}
           RENORMALIZAR: ${{ inputs.renormalizar }}
+          PERFIL: ${{ inputs.perfil }}
         run: |
-          ARGS="--max ${MAXIMO:-40}"
+          ARGS="--max ${MAXIMO:-40} --perfil ${PERFIL:-computador}"
           if [ -n "$INICIO" ]; then ARGS="$ARGS --inicio $INICIO"; fi
           if [ "$RENORMALIZAR" = "true" ]; then ARGS="$ARGS --renormalizar"; fi
           python -m coleta.run $ARGS
@@ -97,14 +112,14 @@ jobs:
           if-no-files-found: ignore
 
       - name: Publicar app (GitHub Pages)
-        if: ${{ inputs.discover == '' }}
+        if: ${{ inputs.discover == '' && !inputs.diagnostico }}
         uses: actions/configure-pages@v5
 
-      - if: ${{ inputs.discover == '' }}
+      - if: ${{ inputs.discover == '' && !inputs.diagnostico }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs
 
       - id: deploy
-        if: ${{ inputs.discover == '' }}
+        if: ${{ inputs.discover == '' && !inputs.diagnostico }}
         uses: actions/deploy-pages@v4
