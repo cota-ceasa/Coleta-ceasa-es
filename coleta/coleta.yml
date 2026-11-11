@@ -1,0 +1,125 @@
+name: Coleta CEASA
+
+on:
+  schedule:
+    # seg-sáb, 12:17 e 18:47 de Brasília (UTC-3)
+    - cron: "17 15 * * 1-6"
+    - cron: "47 21 * * 1-6"
+  workflow_dispatch:
+    inputs:
+      discover:
+        description: "Inspecionar o formulário de uma CEASA (ex.: ES ou BH) em vez de coletar"
+        required: false
+        default: ""
+      diagnostico:
+        description: "Só testar se o GitHub consegue abrir os sites das CEASAs (computador x Android)"
+        type: boolean
+        default: false
+      perfil:
+        description: "Navegador simulado na coleta"
+        type: choice
+        options: [computador, android]
+        default: computador
+      inicio:
+        description: "Coletar a partir desta data (AAAA-MM-DD). Vazio = últimos 30 dias"
+        required: false
+        default: ""
+      max:
+        description: "Máximo de boletins novos POR CEASA nesta execução (são 8 CEASAs: use 40 ao carregar histórico)"
+        required: false
+        default: "60"
+      renormalizar:
+        description: "Refazer a padronização dos boletins já baixados (sem baixar de novo)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: coleta
+  cancel-in-progress: false
+
+jobs:
+  coleta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências Python
+        run: pip install -r requirements.txt
+
+      - name: Versão do Playwright
+        id: pwv
+        run: echo "v=$(python -c 'import importlib.metadata as m;print(m.version("playwright"))')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache do navegador
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pwv.outputs.v }}
+
+      - name: Instalar navegador
+        run: |
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            python -m playwright install-deps chromium
+          else
+            python -m playwright install --with-deps chromium
+          fi
+
+      - name: Diagnóstico de acesso (opcional)
+        if: ${{ inputs.diagnostico }}
+        run: python -m coleta.run --diagnostico
+
+      - name: Inspecionar formulário (opcional)
+        if: ${{ inputs.discover != '' && !inputs.diagnostico }}
+        run: python -m coleta.run --discover "${{ inputs.discover }}" --perfil "${{ inputs.perfil || 'computador' }}"
+
+      - name: Coletar boletins
+        if: ${{ inputs.discover == '' && !inputs.diagnostico }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PYTHONUNBUFFERED: "1"
+          INICIO: ${{ inputs.inicio }}
+          MAXIMO: ${{ inputs.max }}
+          RENORMALIZAR: ${{ inputs.renormalizar }}
+          PERFIL: ${{ inputs.perfil }}
+        run: |
+          ARGS="--max ${MAXIMO:-40} --perfil ${PERFIL:-computador}"
+          if [ -n "$INICIO" ]; then ARGS="$ARGS --inicio $INICIO"; fi
+          if [ "$RENORMALIZAR" = "true" ]; then ARGS="$ARGS --renormalizar"; fi
+          python -m coleta.run $ARGS
+
+      - name: Guardar boletins brutos e diagnósticos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: saida
+          path: saida/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Publicar app (GitHub Pages)
+        if: ${{ inputs.discover == '' && !inputs.diagnostico }}
+        uses: actions/configure-pages@v5
+
+      - if: ${{ inputs.discover == '' && !inputs.diagnostico }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - id: deploy
+        if: ${{ inputs.discover == '' && !inputs.diagnostico }}
+        uses: actions/deploy-pages@v4
