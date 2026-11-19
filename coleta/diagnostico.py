@@ -15,6 +15,7 @@ ALVOS = [
     ("MG site institucional", "https://www.ceasaminas.com.br/informacoesmercado/contator_boletimdiarioprecos.asp"),
     ("ES formulário (controle)", "http://200.198.51.71/detec/filtro_boletim_es/filtro_boletim_es.php"),
     ("BA boletins (SDE)", "https://www.ba.gov.br/sde/boletim-informativo-ceasa-periodo-eleitoral"),
+    ("RJ cotação", "https://www.rj.gov.br/ceasa/Cota%C3%A7%C3%A3o"),
 ]
 PERFIS = ["computador", "android"]
 

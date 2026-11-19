@@ -5,6 +5,7 @@ docs/                    app (PWA), publicado no GitHub Pages
 coleta/run.py            baixar boletins -> banco -> padronizar -> docs/dados.json
 coleta/ceasas/es.py      coletor da CEASA-ES (lê a tabela HTML do boletim)
 coleta/ceasas/ba.py      coletor da CEASA-BA/Salvador (baixa os PDFs listados no portal da SDE)
+coleta/ceasas/rj.py      coletor da CEASA-RJ (Cotação -> ano -> mês -> PDF do dia)
 coleta/db.py             banco (Postgres via DATABASE_URL, ou SQLite local sem configurar nada)
 coleta/exportar.py       banco -> dados.json
 coleta/schema.sql        tabelas (criadas sozinhas)

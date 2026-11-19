@@ -35,6 +35,7 @@ def lista_datas(datas):
 
 def coletar(c, page, conn, inicio, fim, maximo):
     feitas = db.datas_resolvidas(conn, c.id)
+    c.inicio = inicio  # coletores que navegam por ano/mês (RJ) pulam o que é anterior
     no_site = c.datas(page)
     pend = [(d, ref) for d, ref in no_site if inicio <= d <= fim and d not in feitas]
     lote = pend[:maximo]

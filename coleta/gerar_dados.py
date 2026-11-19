@@ -31,15 +31,15 @@ ROTULOS = {  # id -> nome exibido (o banco tem a sua própria tabela "ceasa")
 }
 
 GRUPOS = {
-    "folhosas": ["Acelga", "Agrião", "Alface", "Almeirão", "Brócolis", "Chicória", "Couve", "Couve Chinesa",
+    "folhosas": ["Acelga", "Endívia", "Agrião", "Alface", "Almeirão", "Brócolis", "Chicória", "Couve", "Couve Chinesa",
                  "Couve-flor", "Espinafre", "Mostarda", "Repolho", "Rúcula", "Serralha", "Taioba", "Salsão"],
-    "legumes": ["Abóbora", "Abobrinha", "Ervilha Torta", "Moranga", "Palmito", "Berinjela", "Chuchu", "Jiló", "Maxixe", "Milho Verde", "Pepino",
+    "legumes": ["Abóbora", "Abobrinha", "Aspargo", "Moyashi", "Ervilha Torta", "Moranga", "Palmito", "Berinjela", "Chuchu", "Jiló", "Maxixe", "Milho Verde", "Pepino",
                 "Pimentão Amarelo", "Pimentão Verde", "Pimentão Vermelho", "Quiabo", "Tomate", "Vagem"],
     "raizes": ["Aipim / Mandioca", "Alho", "Nabo", "Rabanete", "Batata", "Batata Doce", "Beterraba", "Cará", "Cebola",
                "Cenoura", "Gengibre", "Inhame"],
-    "temperos": ["Alecrim", "Alho-poró", "Colorau", "Cebolinha", "Coentro", "Erva Doce", "Hortelã", "Manjericão", "Pimenta", "Salsa",
+    "temperos": ["Alecrim", "Alho-poró", "Cheiro Verde", "Colorau", "Louro", "Nirá", "Cebolinha", "Coentro", "Erva Doce", "Hortelã", "Manjericão", "Pimenta", "Salsa",
                  "Sálvia", "Tomilho"],
-    "frutas": ["Abacate", "Abacaxi", "Acerola", "Atemoia", "Carambola", "Jabuticaba", "Limão Galego", "Maracujá Doce", "Romã", "Caqui", "Fruta-pão", "Jaca", "Jenipapo", "Ameixa", "Cacau", "Caju", "Cajamanga", "Graviola", "Nectarina", "Physalis", "Pinha", "Banana Figo", "Banana Maçã", "Banana Nanica", "Banana Ouro",
+    "frutas": ["Abacate", "Abacaxi", "Acerola", "Amora", "Banana Pacovan", "Cajá", "Cereja", "Figo", "Laranja Kinkan", "Laranja Natal", "Laranja Seleta", "Laranja Valência", "Lichia", "Pitaya", "Sapoti", "Seriguela", "Tamarindo", "Atemoia", "Carambola", "Jabuticaba", "Limão Galego", "Maracujá Doce", "Romã", "Caqui", "Fruta-pão", "Jaca", "Jenipapo", "Ameixa", "Cacau", "Caju", "Cajamanga", "Graviola", "Nectarina", "Physalis", "Pinha", "Banana Figo", "Banana Maçã", "Banana Nanica", "Banana Ouro",
                "Banana Prata", "Banana Terra", "Coco Seco", "Coco Verde", "Goiaba", "Kiwi", "Laranja Baía",
                "Laranja Lima", "Laranja Pera", "Lima da Pérsia", "Limão Siciliano", "Limão Tahiti",
                "Mamão Formosa", "Mamão Havaí", "Manga", "Maracujá Azedo", "Maçã", "Melancia", "Melão",
