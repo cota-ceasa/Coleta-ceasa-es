@@ -36,6 +36,9 @@ APELIDOS_GERAIS = {
     "PHISALIS": "Physalis",
     "FISALIS": "Physalis",
     "CACAO": "Cacau",
+    "LEITE COCO": "Leite de Coco",
+    "PEIXE CONGELADO CORVINA": "Corvina Congelada",
+    "PEIXE CONGELADO SARDINHA": "Sardinha Congelada",
     "UVA": "Uva (outras)",  # só vale quando nenhuma uva específica casar (Itália, Niágara, Passa)
 }
 
