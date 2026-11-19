@@ -31,15 +31,15 @@ ROTULOS = {  # id -> nome exibido (o banco tem a sua própria tabela "ceasa")
 }
 
 GRUPOS = {
-    "folhosas": ["Agrião", "Alface", "Almeirão", "Brócolis", "Chicória", "Couve", "Couve Chinesa",
+    "folhosas": ["Acelga", "Agrião", "Alface", "Almeirão", "Brócolis", "Chicória", "Couve", "Couve Chinesa",
                  "Couve-flor", "Espinafre", "Mostarda", "Repolho", "Rúcula", "Serralha", "Taioba", "Salsão"],
     "legumes": ["Abóbora", "Abobrinha", "Berinjela", "Chuchu", "Jiló", "Maxixe", "Milho Verde", "Pepino",
                 "Pimentão Amarelo", "Pimentão Verde", "Pimentão Vermelho", "Quiabo", "Tomate", "Vagem"],
     "raizes": ["Aipim / Mandioca", "Alho", "Batata", "Batata Doce", "Beterraba", "Cará", "Cebola",
                "Cenoura", "Gengibre", "Inhame"],
-    "temperos": ["Alecrim", "Alho-poró", "Cebolinha", "Coentro", "Erva Doce", "Hortelã", "Manjericão", "Salsa",
+    "temperos": ["Alecrim", "Alho-poró", "Cebolinha", "Coentro", "Erva Doce", "Hortelã", "Manjericão", "Pimenta", "Salsa",
                  "Sálvia", "Tomilho"],
-    "frutas": ["Abacate", "Abacaxi", "Ameixa", "Cacau", "Caju", "Cajamanga", "Graviola", "Nectarina", "Physalis", "Pinha", "Banana Figo", "Banana Maçã", "Banana Nanica", "Banana Ouro",
+    "frutas": ["Abacate", "Abacaxi", "Acerola", "Ameixa", "Cacau", "Caju", "Cajamanga", "Graviola", "Nectarina", "Physalis", "Pinha", "Banana Figo", "Banana Maçã", "Banana Nanica", "Banana Ouro",
                "Banana Prata", "Banana Terra", "Coco Seco", "Coco Verde", "Goiaba", "Kiwi", "Laranja Baía",
                "Laranja Lima", "Laranja Pera", "Lima da Pérsia", "Limão Siciliano", "Limão Tahiti",
                "Mamão Formosa", "Mamão Havaí", "Manga", "Maracujá Azedo", "Maçã", "Melancia", "Melão",
@@ -87,6 +87,11 @@ def emb_info(emb):
     m = re.fullmatch(r"(?:CX|SC|PCT|SACO|BDJ|ENG)\s+([\d.,]+)\s*KG", emb)
     if m and num(m.group(1)) > 0:
         return ("kg", num(m.group(1)), "kg")   # preço da embalagem dividido pelo peso -> R$/kg
+    m = re.fullmatch(r"(?:CX|SC|PCT|SACO|BDJ|ENG)\s+([\d,]+)/([\d,]+)\s*KG", emb)
+    if m and num(m.group(1)) > 0 and num(m.group(2)) > 0:  # 'CX 18/20 KG': peso médio da faixa
+        return ("kg", (num(m.group(1)) + num(m.group(2))) / 2, "kg")
+    if emb == "CENTO":
+        return ("un", 100, "cento")
     if emb in ("UN", "UNID", "UNIDADE"):
         return ("un", 1, "unidade")
     if emb in ("DZ", "DUZIA"):
