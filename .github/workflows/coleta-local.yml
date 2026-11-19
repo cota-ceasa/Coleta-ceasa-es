@@ -1,0 +1,60 @@
+name: Coleta CEASA (computador local)
+
+# Roda no "self-hosted runner" instalado no seu computador, para as CEASAs cujo site
+# bloqueia os servidores do GitHub (hoje: RJ). Só grava no banco; o app é publicado pelo
+# workflow "Coleta CEASA" ~15 min depois. Se o computador estiver desligado, a execução
+# fica na fila e é cancelada pela próxima (não acumula).
+on:
+  schedule:
+    # seg-sáb, 12:02 e 18:32 de Brasília (UTC-3), antes da coleta da nuvem (12:17 e 18:47)
+    - cron: "2 15 * * 1-6"
+    - cron: "32 21 * * 1-6"
+  workflow_dispatch:
+    inputs:
+      inicio:
+        description: "Coletar a partir desta data (AAAA-MM-DD). Vazio = últimos 30 dias"
+        required: false
+        default: ""
+      max:
+        description: "Máximo de boletins novos por CEASA nesta execução"
+        required: false
+        default: "60"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coleta-local
+  cancel-in-progress: true
+
+jobs:
+  coleta-local:
+    runs-on: [self-hosted, ceasa-local]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install chromium
+
+      - name: Coletar (CEASAs locais)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PYTHONUNBUFFERED: "1"
+          PYTHONIOENCODING: "utf-8"
+        run: python -m coleta.run --onde local --sem-exportar --max ${{ inputs.max || '60' }} ${{ inputs.inicio && format('--inicio {0}', inputs.inicio) || '' }}
+
+      - name: Guardar boletins brutos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: saida-local
+          path: saida/
+          retention-days: 7
+          if-no-files-found: ignore

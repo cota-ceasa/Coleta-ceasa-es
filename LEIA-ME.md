@@ -62,3 +62,20 @@ e registre em `coleta/ceasas/__init__.py`. Ela aparece sozinha no seletor de loc
 - `3 erros seguidos`: o site provavelmente está fora do ar; a próxima execução continua de onde parou.
 - Site recusando o servidor do GitHub: rode no seu computador com `--headed` (mesmo comando acima),
   apontando `DATABASE_URL` para o mesmo banco.
+
+## Runner no seu computador (CEASA-RJ)
+
+O portal rj.gov.br bloqueia os servidores do GitHub. O Rio é coletado pelo workflow
+**Coleta CEASA (computador local)**, que roda num *self-hosted runner* no seu PC
+(seg–sáb, 12:02 e 18:32; o app é publicado pela coleta da nuvem 15 min depois).
+
+1. GitHub → Settings → Actions → Runners → **New self-hosted runner** → escolha o sistema
+   e rode os comandos mostrados (download + `config`). No `config`, quando pedir
+   *labels*, digite `ceasa-local`.
+2. Deixe rodando como serviço: Windows `./svc.cmd install` e `./svc.cmd start`
+   (ou rode `run.cmd` / `./run.sh` numa janela). O PC precisa estar ligado nos horários.
+3. Teste: Actions → **Coleta CEASA (computador local)** → *Run workflow* com `inicio`.
+
+Segurança (repositório público): Settings → Actions → General → *Fork pull request
+workflows* → **Require approval for all outside collaborators**. Os workflows deste projeto
+não rodam em pull requests, então código de terceiros não executa no seu PC.

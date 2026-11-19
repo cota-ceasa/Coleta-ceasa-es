@@ -52,6 +52,7 @@ class ColetorRJ(ColetorBA):
     nome = "CEASA - Rio de Janeiro (RJ)"
     uf = "RJ"
     url_lista = URL
+    local = True   # o portal rj.gov.br bloqueia os IPs do GitHub: roda no runner do seu computador
 
     def datas(self, page):
         out = {}

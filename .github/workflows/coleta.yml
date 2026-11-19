@@ -97,7 +97,8 @@ jobs:
           RENORMALIZAR: ${{ inputs.renormalizar }}
           PERFIL: ${{ inputs.perfil }}
         run: |
-          ARGS="--max ${MAXIMO:-40} --perfil ${PERFIL:-computador}"
+          # RJ bloqueia os IPs do GitHub: roda no seu computador (coleta-local.yml)
+          ARGS="--onde nuvem --max ${MAXIMO:-40} --perfil ${PERFIL:-computador}"
           if [ -n "$INICIO" ]; then ARGS="$ARGS --inicio $INICIO"; fi
           if [ "$RENORMALIZAR" = "true" ]; then ARGS="$ARGS --renormalizar"; fi
           python -m coleta.run $ARGS

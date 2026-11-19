@@ -110,6 +110,10 @@ def main():
     sys.stdout.reconfigure(line_buffering=True)   # no GitHub Actions o log aparece na hora, não só no fim
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--ceasa", nargs="*", help="IDs (padrão: todas do registro)")
+    ap.add_argument("--onde", choices=["nuvem", "local", "todas"], default="todas",
+                    help="nuvem = CEASAs que o GitHub consegue acessar; local = as que só abrem de\n"
+                         "uma conexão comum (rodam no runner do seu computador)")
+    ap.add_argument("--sem-exportar", action="store_true", help="não gera o dados.json (o runner local só grava no banco)")
     ap.add_argument("--inicio", help="AAAA-MM-DD (padrão: 30 dias atrás)")
     ap.add_argument("--max", type=int, default=40, help="máx. boletins novos por CEASA nesta execução")
     ap.add_argument("--json", default="docs/dados.json", help="arquivo de saída do app")
@@ -143,7 +147,10 @@ def main():
             browser.close()
         return 0
 
-    ids = a.ceasa or list(REGISTRO)
+    if a.renormalizar:
+        a.onde = "todas"  # não acessa site nenhum: refaz todas a partir do banco
+    ids = a.ceasa or [i for i, c in REGISTRO.items()
+                      if a.onde == "todas" or getattr(c, "local", False) == (a.onde == "local")]
     desconhecidas = [i for i in ids if i not in REGISTRO]
     if desconhecidas:
         raise SystemExit(f"CEASA sem coletor: {desconhecidas}. Disponíveis: {list(REGISTRO)}")
@@ -173,7 +180,8 @@ def main():
 
     for c in alvo:
         normalizar(conn, c)
-    exportar(conn, a.json)
+    if not a.sem_exportar:
+        exportar(conn, a.json)
     conn.close()
     return 1 if (falhas == len(alvo) and not a.renormalizar) else 0  # erro só se todas falharem (o GitHub avisa por e-mail)
 
