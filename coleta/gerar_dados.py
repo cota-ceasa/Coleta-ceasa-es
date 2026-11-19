@@ -39,12 +39,12 @@ GRUPOS = {
                "Cenoura", "Gengibre", "Inhame"],
     "temperos": ["Alecrim", "Alho-poró", "Cebolinha", "Coentro", "Erva Doce", "Hortelã", "Manjericão", "Pimenta", "Salsa",
                  "Sálvia", "Tomilho"],
-    "frutas": ["Abacate", "Abacaxi", "Acerola", "Ameixa", "Cacau", "Caju", "Cajamanga", "Graviola", "Nectarina", "Physalis", "Pinha", "Banana Figo", "Banana Maçã", "Banana Nanica", "Banana Ouro",
+    "frutas": ["Abacate", "Abacaxi", "Acerola", "Caqui", "Fruta-pão", "Jaca", "Jenipapo", "Ameixa", "Cacau", "Caju", "Cajamanga", "Graviola", "Nectarina", "Physalis", "Pinha", "Banana Figo", "Banana Maçã", "Banana Nanica", "Banana Ouro",
                "Banana Prata", "Banana Terra", "Coco Seco", "Coco Verde", "Goiaba", "Kiwi", "Laranja Baía",
                "Laranja Lima", "Laranja Pera", "Lima da Pérsia", "Limão Siciliano", "Limão Tahiti",
                "Mamão Formosa", "Mamão Havaí", "Manga", "Maracujá Azedo", "Maçã", "Melancia", "Melão",
                "Morango", "Pêra", "Pêssego", "Tangerina", "Uva (outras)", "Uva Itália", "Uva Niágara", "Uva Passa"],
-    "ovos_graos": ["Amendoim", "Farinha de Mandioca", "Feijão Carioca", "Feijão Manteiga", "Feijão Preto",
+    "ovos_graos": ["Açúcar", "Amendoim", "Arroz", "Farinha de Mandioca", "Feijão Carioca", "Feijão Manteiga", "Feijão Preto",
                    "Feijão Vermelho", "Fubá", "Milho Seco", "Ovos", "Ovos de Codorna"],
     "pescados": ["Atum", "Bacalhau", "Camarão", "Corvina", "Manjuba", "Mistura de Peixes", "Panga", "Pargo", "Pescadinha",
                  "Raia", "Sardinha", "Tainha"],
@@ -84,14 +84,19 @@ def emb_info(emb):
     m = re.fullmatch(r"UN\s+([\d.,]+)\s*KG", emb)
     if m:
         return ("un", 1, f"unidade ≈ {m.group(1)} kg")
-    m = re.fullmatch(r"(?:CX|SC|PCT|SACO|BDJ|ENG)\s+([\d.,]+)\s*KG", emb)
+    m = re.fullmatch(r"(?:CX|SC|PCT|SACO|BDJ|ENG|FRD)\s+([\d.,]+)\s*KG", emb)
     if m and num(m.group(1)) > 0:
         return ("kg", num(m.group(1)), "kg")   # preço da embalagem dividido pelo peso -> R$/kg
-    m = re.fullmatch(r"(?:CX|SC|PCT|SACO|BDJ|ENG)\s+([\d,]+)/([\d,]+)\s*KG", emb)
+    m = re.fullmatch(r"(?:CX|SC|PCT|SACO|BDJ|ENG|FRD)\s+([\d,]+)/([\d,]+)\s*KG", emb)
     if m and num(m.group(1)) > 0 and num(m.group(2)) > 0:  # 'CX 18/20 KG': peso médio da faixa
         return ("kg", (num(m.group(1)) + num(m.group(2))) / 2, "kg")
     if emb == "CENTO":
         return ("un", 100, "cento")
+    if emb == "MOLHO":
+        return ("un", 1, "molho")
+    m = re.fullmatch(r"(?:CX|FRD|PCT)\s+(\d+)\s+[\d,]+\s*(?:ML|G|GR|L|LT)", emb)
+    if m:  # 'CX 12 500ML': caixa com 12 unidades
+        return ("un", int(m.group(1)), f"{emb.split()[0].lower()} {m.group(1)} un")
     if emb in ("UN", "UNID", "UNIDADE"):
         return ("un", 1, "unidade")
     if emb in ("DZ", "DUZIA"):

@@ -31,6 +31,10 @@ APELIDOS = {
     "BATATINHA": "Batata",
     "BROCOLI": "Brócolis",
     "PIMENTAO": "Pimentão Verde",
+    "MANGERICAO": "Manjericão",
+    "FRUTA PAO": "Fruta-pão",
+    "ACUCAR": "Açúcar",
+    "MILHO": "Milho Seco",  # milho amarelo/branco/pipoca em fardo ("MILHO VERDE" casa antes)
 }
 SITUACAO_BA = {"EST": "ME", "FIR": "MFI", "FRA": "MFR"}  # -> códigos de padronizar.SITUACAO
 NUM = re.compile(r"^\d{1,3}(?:\.\d{3})*,\d{2}$")
@@ -135,6 +139,7 @@ class ColetorBA(Coletor):
                     ignoradas.append(cel[0])
                 continue
             prod, unid, _proc, mn, com, mx, sit = cel
+            prod, unid = reparar(prod, unid)
             c = cotacao(prod, embalagem_ba(unid), mn, com, mx, SITUACAO_BA.get(sit.upper(), ""),
                         apelidos=APELIDOS, data_ok=data_pdf in (None, data))
             if c:
@@ -213,8 +218,12 @@ def linhas_do_pdf(dados):
     out = []
     with pdfplumber.open(io.BytesIO(dados)) as pdf:
         for npag, pag in enumerate(pdf.pages, 1):
-            for palavras in _linhas_de_palavras(pag.extract_words()):
-                cel = _celulas(palavras)
+            palavras_pag = pag.extract_words()
+            # tudo à direita do início da coluna PROCEDÊNCIA (antes dos preços) é procedência,
+            # mesmo com erro de digitação ('BA/ES/RS/SC/S', 'ES/M,G', 'BA;PB')
+            corte = next((w["x0"] - 15 for w in palavras_pag if w["text"].upper().startswith("PROCED")), None)
+            for palavras in _linhas_de_palavras(palavras_pag):
+                cel = _celulas(palavras, corte)
                 texto = " ".join(w["text"] for w in palavras)
                 if cel:
                     out.append((npag, len(out), "pdf", cel))
@@ -233,7 +242,7 @@ def _linhas_de_palavras(palavras, tol=3):
     return [sorted(l, key=lambda w: w["x0"]) for l in linhas]
 
 
-def _celulas(ws):
+def _celulas(ws, corte=None):
     """Lê a linha da direita para a esquerda: situação, máx, comum, mín, procedência;
     o que sobra é produto + unidade, separados pelo maior espaço em branco entre as palavras."""
     ws = list(ws)
@@ -243,7 +252,10 @@ def _celulas(ws):
         nums.insert(0, ws.pop()["text"])
     if len(nums) != 3 or numero(nums[1]) is None:
         return None
-    proc = ws.pop()["text"] if ws and UFS.match(ws[-1]["text"]) else ""
+    proc = []
+    while ws and (ws[-1]["x0"] >= corte if corte else not proc and UFS.match(ws[-1]["text"])):
+        proc.insert(0, ws.pop()["text"])
+    proc = " ".join(proc)
     if not ws:
         return None
     gaps = [(ws[i + 1]["x0"] - ws[i]["x1"], i) for i in range(len(ws) - 1)]
@@ -251,6 +263,30 @@ def _celulas(ws):
     corte = i + 1 if gap > 15 else len(ws)  # sem espaço grande = linha sem unidade
     txt = lambda p: " ".join(w["text"] for w in p)
     return [txt(ws[:corte]), txt(ws[corte:]), proc, *nums, sit]
+
+
+UNID_FIM = re.compile(r"^(.*?)\s+((?:CX|SC|KG|UN|UND|CENTO|MOL|FRD|PCT)\b\.?.*)$", re.I)
+PROC_FIM = re.compile(r"\s+[A-Z]{2}(?:[/;,]+[A-Z]{0,3})+/?$")
+
+
+def reparar(prod, unid):
+    """Linhas lidas antes da correção da coluna PROCEDÊNCIA (procedência longa/com erro):
+    'MACA ... CX. 20 KG' | 'BA/ES/RS/SC/S'  -> 'MACA ...' | 'CX. 20 KG'
+    'PINHA' | 'CX 20KG BA;PB'                -> 'PINHA' | 'CX 20KG'"""
+    if embalagem_ok(unid):
+        return prod, unid
+    sem_proc = PROC_FIM.sub("", unid)
+    if sem_proc != unid and embalagem_ok(sem_proc):
+        return prod, sem_proc
+    m = UNID_FIM.match(prod)
+    if m and re.fullmatch(r"[A-Z/;,.\] \[]*", unid.upper()) and embalagem_ok(m.group(2)):
+        return m.group(1), m.group(2)
+    return prod, unid
+
+
+def embalagem_ok(u):
+    from ..gerar_dados import emb_info
+    return emb_info(embalagem_ba(u)) is not None
 
 
 def norm_secao(t):
@@ -269,6 +305,8 @@ def embalagem_ba(u):
     e = re.sub(r"(\d)(KG|DZ)\b", r"\1 \2", e)
     e = re.sub(r"\bUND?\b", "UN", e)
     e = re.sub(r"\s+", " ", e).strip()
+    if re.match(r"MOL\b|MACO\b|MC\b", e):  # molho/maço (ex.: 'MOL 800GR', 'MOL 360G')
+        return "MOLHO"
     if re.fullmatch(r"(?:CX|SC) [\d,]+(?:/[\d,]+)?", e):  # caixa/saco sem unidade = kg
         e += " KG"
     return e
