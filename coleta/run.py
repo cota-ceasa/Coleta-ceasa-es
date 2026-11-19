@@ -137,7 +137,8 @@ def main():
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=not a.headed)
             browser_p = p
-            REGISTRO[a.discover].discover(contexto(browser).new_page(), SAIDA)
+            c = REGISTRO[a.discover]
+            c.discover(contexto(browser, **getattr(c, "contexto", {})).new_page(), SAIDA)
             browser.close()
         return 0
 
@@ -159,7 +160,7 @@ def main():
         browser_p = p
         browser = p.chromium.launch(headless=not a.headed)
         for c in ([] if a.renormalizar else alvo):  # uma CEASA com problema não derruba as outras
-            ctx = contexto(browser, accept_downloads=True)  # o site usa certificado de IP
+            ctx = contexto(browser, accept_downloads=True, **getattr(c, "contexto", {}))  # o site usa certificado de IP
             try:
                 coletar(c, ctx.new_page(), conn, inicio, hoje, a.max)
             except Exception as e:  # noqa: BLE001

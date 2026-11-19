@@ -38,30 +38,77 @@ UFS = re.compile(r"^(?:[A-Z]{2}/?)+$")
 SECOES = {"FRUTAS", "HORTALICAS", "OVOS", "GRAOS", "CEREAIS", "PESCADOS", "DIVERSOS"}
 
 
+UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+      "Chrome/131.0.0.0 Safari/537.36")
+# fetch() de dentro da página: vai com cookies e a "cara" completa do navegador
+JS_FETCH = """async (u) => {
+  const r = await fetch(u, {credentials: 'include'});
+  const b = new Uint8Array(await r.arrayBuffer());
+  let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
+  return [r.status, btoa(s)];
+}"""
+
+
 class ColetorBA(Coletor):
     id = "BA"
     nome = "CEASA - Salvador (BA)"
     uf = "BA"
+    # o portal ba.gov.br recusa (HTTP 500) navegador "headless"/robô: simula um Chrome comum
+    contexto = {"user_agent": UA, "locale": "pt-BR",
+                "extra_http_headers": {"Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8"}}
 
-    def _get(self, page, url):
-        r = page.request.get(url, timeout=60000)
+    def _abrir(self, page, tentativas=4):
+        """Abre a página dos boletins como um navegador comum; tenta de novo se o site recusar."""
+        page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        status = None
+        for n in range(tentativas):
+            try:
+                r = page.goto(URL, wait_until="domcontentloaded", timeout=60000)
+                status = r.status if r else None
+                if status and status < 400 and "<a" in page.content():
+                    page.wait_for_timeout(1000)
+                    return page.content()
+            except Exception as e:  # noqa: BLE001
+                status = str(e).splitlines()[0][:120]
+            print(f"[BA] tentativa {n + 1}: site respondeu {status}; aguardando para tentar de novo")
+            page.wait_for_timeout(5000 * (n + 1))
+        try:  # guarda o que o site mostrou, para diagnóstico (artefato "saida")
+            from pathlib import Path
+            Path("saida").mkdir(exist_ok=True)
+            Path("saida/BA_erro.html").write_text(page.content(), encoding="utf-8")
+            page.screenshot(path="saida/BA_erro.png", full_page=True)
+        except Exception:  # noqa: BLE001
+            pass
+        raise RuntimeError(f"site da SDE-BA recusou o acesso ({status}) após {tentativas} tentativas: {URL}")
+
+    def _baixar(self, page, url):
+        """Bytes do arquivo (PDF ou HTML), ou None se não existir."""
+        if not page.url.startswith("https://www.ba.gov.br/"):
+            self._abrir(page)
+        try:
+            import base64
+            status, b64 = page.evaluate(JS_FETCH, url)
+            if status == 404:
+                return None
+            if status < 400:
+                return base64.b64decode(b64)
+        except Exception:  # noqa: BLE001 (ex.: redirecionamento para outro domínio)
+            status = None
+        r = page.request.get(url, timeout=60000, headers={"Referer": URL})
         if r.status == 404:
-            return None, ""
+            return None
         if not r.ok:
-            raise RuntimeError(f"HTTP {r.status} ao abrir {url}")
-        return r.body(), r.headers.get("content-type", "")
+            raise RuntimeError(f"HTTP {r.status} ao baixar {url}")
+        return r.body()
 
     def datas(self, page):
-        corpo, _ = self._get(page, URL)
-        if corpo is None:
-            raise RuntimeError(f"página de boletins não encontrada: {URL} (defina CEASA_BA_URL)")
-        out = links_do_html(corpo.decode("utf-8", "replace"), URL)
+        out = links_do_html(self._abrir(page), URL)
         if not out:
             raise RuntimeError("nenhum link de boletim na página (o site mudou? rode --discover BA)")
         return out
 
     def capturar(self, page, ref):
-        corpo, tipo = self._get(page, ref)
+        corpo = self._baixar(page, ref)
         if corpo is None:
             return None
         if not corpo.startswith(b"%PDF"):  # página de publicação: procura o PDF dentro dela
@@ -69,7 +116,7 @@ class ColetorBA(Coletor):
             pdfs = re.findall(r'href="([^"]+\.pdf)"', html, re.I)
             if not pdfs:
                 return None
-            corpo, tipo = self._get(page, urljoin(ref, unescape(pdfs[0])))
+            corpo = self._baixar(page, urljoin(ref, unescape(pdfs[0])))
             if corpo is None or not corpo.startswith(b"%PDF"):
                 return None
         linhas = linhas_do_pdf(corpo)
@@ -114,10 +161,12 @@ class ColetorBA(Coletor):
         return out
 
     def discover(self, page, pasta):
-        page.goto(URL, wait_until="domcontentloaded", timeout=60000)
-        (pasta / "pagina_inicial.html").write_text(page.content(), encoding="utf-8")
-        page.screenshot(path=str(pasta / "pagina.png"), full_page=True)
-        datas = links_do_html(page.content(), URL)
+        try:
+            html = self._abrir(page)
+        finally:
+            (pasta / "pagina_inicial.html").write_text(page.content(), encoding="utf-8")
+            page.screenshot(path=str(pasta / "pagina.png"), full_page=True)
+        datas = links_do_html(html, URL)
         print(f"{len(datas)} boletins na página. Mais antigos/mais novos:", datas[:3], "...", datas[-3:])
         print(f"Salvei {pasta}/pagina_inicial.html e pagina.png")
 
