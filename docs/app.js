@@ -5,18 +5,19 @@ const LS_ANON = 'cc-anon';  // preferências de quem não entrou (favoritos, mer
 
 const UNIDADE = { kg: 'R$/kg', dz: 'R$/dúzia', un: 'R$/un' };
 const PERIODOS = [
-    { rot: '7 dias', dias: 7 },
+    { rot: '1 semana', dias: 7, so: 'ES' },   // só Vitória tem boletim todo dia útil
     { rot: '1 mês', dias: 30 },
     { rot: '3 meses', dias: 91 },
-    { rot: '6 meses', dias: 182 }
+    { rot: '1 ano', dias: 365 }
 ];
+const periodosDe = mid => PERIODOS.filter(p => !p.so || p.so === mid);
 
 let dados = null;               // { gerado_em, mercados, itens }
 let favoritos = [];
 let categoriaAtual = 'todos';
 let mercadoAtual = 'ES';
 let apenasFavoritos = false;
-let periodoIdx = 0;             // abre em 1 semana
+let periodoDias = 7;            // abre em 1 semana (ES) ou 1 mês (demais)
 let det = null;                 // { key } quando a tela de detalhe está aberta
 let scrollLista = 0;
 
@@ -242,7 +243,8 @@ function renderDetalhe() {
     const y = window.scrollY;
     const it = itemPorChave(det.key), mid = mercadoAtual, m = it.m[mid], merc = mercadoPor(mid);
     const { a, c, pts } = variacao(it, mid);
-    const per = PERIODOS[periodoIdx];
+    const pers = periodosDe(mid);
+    const per = pers.find(p => p.dias === periodoDias) || pers[0];
     const ultimo = pts[pts.length - 1].d;
     let w = per.dias ? pts.filter(p => p.d >= somarDias(ultimo, -per.dias)) : pts;
     if (w.length < 2) w = pts.slice(-2);
@@ -277,9 +279,9 @@ function renderDetalhe() {
             ${c != null && Math.abs(c) > 50 ? '<div class="mt-3 bg-ouro/10 text-ouro border border-ouro/30 rounded-xl px-3 py-2.5 text-sm"><i class="fa-solid fa-triangle-exclamation mr-1.5"></i>Variação muito acima do normal. Confira este preço antes de decidir.</div>' : ''}
         </div>
 
-        <div class="flex gap-2 overflow-x-auto no-scrollbar" role="group" aria-label="Período do gráfico">
-            ${PERIODOS.map((p, i) => `<button data-act="per" data-arg="${i}" aria-pressed="${i === periodoIdx}" class="flex-none px-4 py-2 rounded-full text-sm font-semibold border transition-colors ${i === periodoIdx ? 'bg-ouro text-mata-950 border-ouro' : 'bg-mata-900 text-slate-300 border-mata-700 hover:border-verde/60'}">${p.rot}</button>`).join('')}
-            <button data-act="mais" class="flex-none px-4 py-2 rounded-full text-sm font-semibold border border-ouro/60 text-ouro hover:bg-ouro/10 transition-colors"><i class="fa-solid fa-lock mr-1.5 text-xs"></i>Mais dados sob consulta</button>
+        <div class="flex flex-wrap gap-1.5" role="group" aria-label="Período do gráfico">
+            ${pers.map(p => `<button data-act="per" data-arg="${p.dias}" aria-pressed="${p === per}" class="flex-none px-2.5 py-1.5 rounded-full text-xs font-semibold border whitespace-nowrap transition-colors ${p === per ? 'bg-ouro text-mata-950 border-ouro' : 'bg-mata-900 text-slate-300 border-mata-700 hover:border-verde/60'}">${p.rot}</button>`).join('')}
+            <button data-act="mais" class="flex-none px-2.5 py-1.5 rounded-full text-xs font-semibold border border-ouro/60 text-ouro whitespace-nowrap hover:bg-ouro/10 transition-colors"><i class="fa-solid fa-lock mr-1 text-[10px]"></i>Mais dados sob consulta</button>
         </div>
 
         <div class="${box}">
@@ -374,7 +376,7 @@ document.addEventListener('click', (e) => {
                     <button onclick="fecharFolha()" class="mt-5 w-full bg-ouro text-mata-950 font-bold py-3 rounded-xl">Fechar</button>
                 </div>
             </div>`); break;
-        case 'per': periodoIdx = +arg; renderDetalhe(); break;
+        case 'per': periodoDias = +arg; renderDetalhe(); break;
     }
 });
 document.addEventListener('keydown', (e) => {
