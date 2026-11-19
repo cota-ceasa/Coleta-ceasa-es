@@ -1,14 +1,14 @@
 // COTA CEA$A — lista de cotações, cards, detalhe com histórico e configurações
 // Depende de: util.js, grafico.js, auth.js (carregados antes)
 
-const LS_ANON = 'cc-anon';  // preferências de quem não entrou (favoritos, mercado, previsão)
+const LS_ANON = 'cc-anon';  // preferências de quem não entrou (favoritos, mercado)
 
 const UNIDADE = { kg: 'R$/kg', dz: 'R$/dúzia', un: 'R$/un' };
 const PERIODOS = [
     { rot: '7 dias', dias: 7 },
-    { rot: '15 dias', dias: 15 },
     { rot: '1 mês', dias: 30 },
-    { rot: 'Tudo', dias: null }
+    { rot: '3 meses', dias: 91 },
+    { rot: '6 meses', dias: 182 }
 ];
 
 let dados = null;               // { gerado_em, mercados, itens }
@@ -16,14 +16,13 @@ let favoritos = [];
 let categoriaAtual = 'todos';
 let mercadoAtual = 'ES';
 let apenasFavoritos = false;
-let previsaoOn = true;
-let periodoIdx = 3;
+let periodoIdx = 0;             // abre em 1 semana
 let det = null;                 // { key } quando a tela de detalhe está aberta
 let scrollLista = 0;
 
 // ---------- preferências (por usuário, ou do aparelho se não houver login) ----------
 function salvarPrefs() {
-    const p = { favs: favoritos, mercado: mercadoAtual, prev: previsaoOn };
+    const p = { favs: favoritos, mercado: mercadoAtual };
     if (Auth.usuario()) Auth.gravarPrefs(p); else gravarLS(LS_ANON, p);
 }
 function carregarPrefs() {
@@ -32,7 +31,6 @@ function carregarPrefs() {
         : lerLS(LS_ANON, { favs: lerLS('favs_ceasa_v2', []), mercado: lerLS('mercado_ceasa', 'ES') });
     favoritos = Array.isArray(p.favs) ? p.favs : [];
     mercadoAtual = p.mercado || 'ES';
-    previsaoOn = p.prev !== false;
     if (dados) {
         const chaves = new Set(dados.itens.map(i => i.k));
         favoritos = favoritos.filter(k => chaves.has(k));
@@ -40,7 +38,7 @@ function carregarPrefs() {
     }
 }
 // chamadas pelo auth.js
-function aoCriarUsuario() { return { favs: favoritos, mercado: mercadoAtual, prev: previsaoOn }; }
+function aoCriarUsuario() { return { favs: favoritos, mercado: mercadoAtual }; }
 function aoMudarUsuario() {
     carregarPrefs();
     apenasFavoritos = false;
@@ -78,18 +76,20 @@ function serie(it, mid) {   // [{d, v}] só com os dias em que o item foi cotado
     memo.set(chave, pts);
     return pts;
 }
+// Frescor do dado: o app não pode deixar um preço antigo parecer o de hoje.
+//  velho      = a última cotação do item não está entre os 3 últimos boletins do mercado (lista esmaecida)
+//  muitoVelho = mais de 30 dias antes do boletim mais recente (some da lista; só na busca ou nos favoritos)
+const DIAS_LISTA = 30;
+function frescor(it, mid) {
+    const m = mercadoPor(mid), dt = it.m[mid].dt || m.data;
+    return { dt, velho: !m.datas.slice(-3).includes(dt), muitoVelho: dt < somarDias(m.data, -DIAS_LISTA) };
+}
+
 function variacao(it, mid) {   // variação em relação à cotação anterior
     const pts = serie(it, mid), n = pts.length;
     const l = it.m[mid].com, a = n > 1 ? pts[n - 2].v : null;
     return { l, a, c: a ? (l - a) / a * 100 : null, pts };
 }
-function previsaoDe(pts) {
-    const f = Graf.previsao(pts.map(p => p.v), 5);
-    if (!f.length) return [];
-    const d = Graf.diasUteis(pts[pts.length - 1].d, f.length);
-    return f.map((x, i) => ({ ...x, d: d[i] }));
-}
-
 async function carregarDados() {
     try {
         const resp = await fetch('dados.json', { cache: 'no-cache' });
@@ -140,6 +140,7 @@ function renderizarGrid() {
         if (!i.m[mercadoAtual]) return false;
         if (apenasFavoritos && !favoritos.includes(i.k)) return false;
         if (categoriaAtual !== 'todos' && i.g !== categoriaAtual) return false;
+        if (!busca && !favoritos.includes(i.k) && frescor(i, mercadoAtual).muitoVelho) return false;   // dado velho demais
         return casaBusca(i, busca);
     });
 
@@ -178,13 +179,15 @@ function criarCard(item, mercado) {
     const isFav = favoritos.includes(item.k);
     const detalhe = item.d.replace(/\bLonga Vida\b/g, 'LV');   // abreviação para caber na linha
     const sit = c.s;
-    const tom = sit === 'firme' ? 'text-verde-claro' : sit === 'fraco' ? 'text-rose-400' : 'text-slate-400';
+    const fr = frescor(item, mercadoAtual), velho = fr.velho;
+    const tom = velho ? 'text-slate-500' : sit === 'firme' ? 'text-verde-claro' : sit === 'fraco' ? 'text-rose-400' : 'text-slate-400';
     // linha de apoio: unidade · embalagem · situação do mercado · (cotação antiga)
     const apoio = [
         UNIDADE[item.u],
         item.e !== 'kg' ? esc(item.e) : '',
         sit ? `<span class="${tom} font-semibold">${esc(sit)}</span>` : '',
-        c.dt && c.dt !== mercado.data ? `<span class="text-ouro/90"><i class="fa-regular fa-clock"></i> ${dataCurta(c.dt)}</span>` : ''
+        c.dt && c.dt !== mercado.data
+            ? `<span class="${velho ? 'text-ouro font-extrabold' : 'text-ouro/90'}"><i class="fa-regular fa-clock"></i> ${c.dt.slice(0, 4) === mercado.data.slice(0, 4) ? dataCurta(c.dt) : dataBR(c.dt)}</span>` : ''
     ].filter(Boolean).join(' · ');
 
     const card = document.createElement('div');
@@ -197,13 +200,13 @@ function criarCard(item, mercado) {
     card.innerHTML = `
         <button data-act="fav" data-arg="${esc(item.k)}" aria-pressed="${isFav}" aria-label="${isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}" class="${isFav ? 'text-ouro' : 'text-ouro/70 hover:text-ouro'} transition-colors p-2 shrink-0">${ESTRELA(isFav, 'w-5 h-5')}</button>
         <div class="min-w-0 flex-1">
-            <h3 class="font-bold text-white text-[15px] leading-tight">${esc(item.p)}${detalhe ? ` <span class="font-semibold text-slate-300">${esc(detalhe)}</span>` : ''}</h3>
-            <p class="text-[11px] text-slate-400 mt-0.5 leading-snug">${apoio}</p>
+            <h3 class="font-bold ${velho ? 'text-slate-400' : 'text-white'} text-[15px] leading-tight">${esc(item.p)}${detalhe ? ` <span class="font-semibold ${velho ? 'text-slate-500' : 'text-slate-300'}">${esc(detalhe)}</span>` : ''}</h3>
+            <p class="text-[11px] ${velho ? 'text-slate-500' : 'text-slate-400'} mt-0.5 leading-snug">${apoio}</p>
         </div>
-        ${Graf.mini(pts.slice(-22).map(p => p.v))}
+        ${Graf.mini(pts.slice(-22).map(p => p.v), velho)}
         <div class="text-right shrink-0 min-w-[78px]">
-            <div class="text-lg font-bold text-verde-claro leading-none">R$ ${preco(c.com)}</div>
-            <div class="mt-1">${chipVar(varPct)}</div>
+            <div class="text-lg font-bold ${velho ? 'text-slate-500' : 'text-verde-claro'} leading-none">R$ ${preco(c.com)}</div>
+            <div class="mt-1 ${velho ? 'opacity-50' : ''}">${chipVar(varPct)}</div>
         </div>`;
     return card;
 }
@@ -245,11 +248,11 @@ function renderDetalhe() {
     if (w.length < 2) w = pts.slice(-2);
     const vals = w.map(p => p.v);
     const mn = Math.min(...vals), mx = Math.max(...vals), md = vals.reduce((s, v) => s + v, 0) / vals.length;
-    const fc = previsaoOn ? previsaoDe(pts) : [];
     const fav = favoritos.includes(it.k);
     const detalhe = it.d.replace(/\bLonga Vida\b/g, 'LV');
     const sub = [merc.nome, it.e !== 'kg' ? it.e : ''].filter(Boolean).join(' · ');
     const box = 'bg-mata-900 border border-mata-800 rounded-2xl p-4';
+    const fr = frescor(it, mid);
 
     el('vista-detalhe').innerHTML = `
         <div class="flex items-center justify-between">
@@ -263,33 +266,25 @@ function renderDetalhe() {
             <p class="text-xs text-slate-500 mt-0.5">Cotação de ${dataBR(merc.data, true)}${m.dt ? ` · última cotação deste item: ${dataBR(m.dt)}` : ''}</p>
         </div>
 
-        <div class="grid grid-cols-3 gap-1.5 bg-mata-900 border border-mata-800 rounded-2xl p-1.5" role="group" aria-label="Localidade">
-            ${dados.mercados.filter(x => it.m[x.id]).map(x => `<button data-act="merc" data-arg="${x.id}" class="py-2.5 rounded-xl text-sm font-semibold transition-colors ${x.id === mid ? 'bg-ouro text-mata-950' : 'text-slate-300 hover:bg-mata-800'}">${x.id}</button>`).join('')}
+        <div class="flex flex-wrap gap-1.5 bg-mata-900 border border-mata-800 rounded-2xl p-1.5" role="group" aria-label="Localidade">
+            ${dados.mercados.filter(x => it.m[x.id]).map(x => `<button data-act="merc" data-arg="${x.id}" class="flex-1 basis-[22%] py-2.5 rounded-xl text-sm font-semibold transition-colors ${x.id === mid ? 'bg-ouro text-mata-950' : 'text-slate-300 hover:bg-mata-800'}">${x.id}</button>`).join('')}
         </div>
 
         <div>
             <div class="flex items-baseline gap-2"><span class="text-5xl font-bold text-verde-claro leading-none">${R$(m.com)}</span><span class="text-slate-400">${UNIDADE[it.u].replace('R$', '')}</span></div>
             <div class="mt-2 flex items-center gap-2 flex-wrap">${chipVar(c)}${a ? `<span class="text-sm text-slate-400">cotação anterior ${R$(a)}</span>` : ''}</div>
+            ${fr.velho ? `<div class="mt-3 bg-ouro/10 text-ouro border border-ouro/30 rounded-xl px-3 py-2.5 text-sm"><i class="fa-solid fa-clock-rotate-left mr-1.5"></i><b>Dado antigo:</b> a última cotação deste item é de ${dataBR(fr.dt, true)}. Pode não refletir o preço de hoje.</div>` : ''}
             ${c != null && Math.abs(c) > 50 ? '<div class="mt-3 bg-ouro/10 text-ouro border border-ouro/30 rounded-xl px-3 py-2.5 text-sm"><i class="fa-solid fa-triangle-exclamation mr-1.5"></i>Variação muito acima do normal. Confira este preço antes de decidir.</div>' : ''}
         </div>
 
         <div class="flex gap-2 overflow-x-auto no-scrollbar" role="group" aria-label="Período do gráfico">
             ${PERIODOS.map((p, i) => `<button data-act="per" data-arg="${i}" aria-pressed="${i === periodoIdx}" class="flex-none px-4 py-2 rounded-full text-sm font-semibold border transition-colors ${i === periodoIdx ? 'bg-ouro text-mata-950 border-ouro' : 'bg-mata-900 text-slate-300 border-mata-700 hover:border-verde/60'}">${p.rot}</button>`).join('')}
+            <button data-act="mais" class="flex-none px-4 py-2 rounded-full text-sm font-semibold border border-ouro/60 text-ouro hover:bg-ouro/10 transition-colors"><i class="fa-solid fa-lock mr-1.5 text-xs"></i>Mais dados sob consulta</button>
         </div>
 
         <div class="${box}">
-            ${Graf.desenhar(w, fc)}
-            <p class="text-xs text-slate-500 mt-1">Passe o cursor ou deslize o dedo no gráfico para ver cada dia.${fc.length ? ' Pontilhado amarelo e faixa: previsão (teste).' : ''}</p>
-        </div>
-
-        <div class="${box}">
-            <div class="flex items-center justify-between">
-                <b class="text-lg text-white">Previsão <span class="text-slate-400 font-medium text-sm">(teste)</span></b>
-                <button data-act="prev" aria-pressed="${previsaoOn}" class="px-3.5 py-2 rounded-xl text-sm font-semibold border border-mata-700 bg-mata-800 text-slate-200 hover:border-ouro/60">${previsaoOn ? 'Ocultar' : 'Mostrar'}</button>
-            </div>
-            ${fc.length ? `<table class="w-full mt-2 text-[15px]">${fc.map(x => `<tr class="border-t border-mata-800"><td class="py-2.5 text-slate-300">${dataCurta(x.d)}</td><td class="text-slate-400">${preco(x.lo)} – ${preco(x.hi)}</td><td class="text-right font-bold text-white">${R$(x.p)} ${chipVar((x.p - m.com) / m.com * 100)}</td></tr>`).join('')}</table>`
-                : previsaoOn ? '<p class="text-sm text-slate-400 mt-2">Histórico curto demais para estimar.</p>' : ''}
-            <p class="text-xs text-slate-500 mt-2">Estimativa simples (tendência recente e retorno à média), só para testar o app. Não é recomendação.</p>
+            ${Graf.desenhar(w)}
+            <p class="text-xs text-slate-500 mt-1">Passe o cursor ou deslize o dedo no gráfico para ver cada dia. Linha amarela tracejada: preço mais recente.</p>
         </div>
 
         <div class="${box}">
@@ -331,12 +326,6 @@ function alterarMercado(id) {
 }
 function filtrarProdutos() { renderizarGrid(); }
 
-function alternarPrevisao() {
-    previsaoOn = !previsaoOn;
-    salvarPrefs();
-    if (det) renderDetalhe(); else renderizarGrid();
-}
-
 // ---------- conta e configurações ----------
 function abrirModalAuth(aba) {
     if (Auth.usuario()) abrirConfiguracoes(); else Auth.abrir(aba === 'new' ? 'new' : 'in');
@@ -362,14 +351,6 @@ function abrirConfiguracoes() {
                        <button class="w-full text-slate-300 underline py-3 text-sm" onclick="Auth.abrir('new')">Criar um acesso novo</button>`}
             </div>
 
-            <div class="bg-mata-900 border border-mata-800 rounded-2xl p-4 flex items-center justify-between gap-3">
-                <div><p class="font-semibold text-white">Mostrar previsão <span class="text-slate-400 font-medium text-sm">(teste)</span></p>
-                     <p class="text-sm text-slate-400">Estimativa dos próximos 5 dias úteis nos cards e no gráfico.</p></div>
-                <button role="switch" aria-checked="${previsaoOn}" aria-label="Mostrar previsão" onclick="alternarPrevisao();abrirConfiguracoes()" class="relative flex-none w-12 h-7 rounded-full transition-colors ${previsaoOn ? 'bg-verde' : 'bg-mata-700'}">
-                    <span class="absolute top-0.5 ${previsaoOn ? 'left-[22px]' : 'left-0.5'} w-6 h-6 rounded-full bg-white transition-all"></span>
-                </button>
-            </div>
-
             <p class="text-xs text-slate-500">Dados: boletins diários do CEASA, atualizados em ${dados ? dataBR(dados.gerado_em.slice(0, 10)) : '—'}. Os acessos e favoritos ficam salvos só neste aparelho.</p>
         </div>`);
 }
@@ -384,8 +365,16 @@ document.addEventListener('click', (e) => {
         case 'abrir': abrirDetalhe(arg); break;
         case 'voltar': voltar(); break;
         case 'merc': alterarMercado(arg); break;
+        case 'mais': abrirFolha(`
+            <div class="p-6 pt-16 text-center">
+                <div class="bg-mata-900 border border-ouro/40 rounded-2xl p-6">
+                    <i class="fa-solid fa-chart-line text-ouro text-3xl mb-3"></i>
+                    <h3 class="text-xl font-bold text-white mb-2">Mais dados sob consulta</h3>
+                    <p class="text-slate-300 leading-relaxed">Para mais dados e análises, entre em contato pelo email <a href="mailto:cota.ceasa@gmail.com" class="text-ouro font-semibold underline break-all">cota.ceasa@gmail.com</a></p>
+                    <button onclick="fecharFolha()" class="mt-5 w-full bg-ouro text-mata-950 font-bold py-3 rounded-xl">Fechar</button>
+                </div>
+            </div>`); break;
         case 'per': periodoIdx = +arg; renderDetalhe(); break;
-        case 'prev': alternarPrevisao(); break;
     }
 });
 document.addEventListener('keydown', (e) => {
