@@ -46,19 +46,21 @@
         html.claro .text-slate-500 { color: #64748b; }
         html.claro .hover\:text-white:hover { color: #000; }
         html.claro .text-verde-claro { color: #0b8a3b; }
-        html.claro .text-ouro, html.claro .hover\:text-ouro:hover { color: #a16207; }
-        html.claro .text-ouro\/70 { color: rgba(161, 98, 7, .75); }
-        html.claro .text-ouro\/90 { color: rgba(161, 98, 7, .95); }
-        html.claro .bg-ouro\/10 { background-color: rgba(202, 138, 4, .12); }
-        html.claro .hover\:bg-ouro\/10:hover, html.claro .hover\:bg-ouro\/20:hover { background-color: rgba(202, 138, 4, .2); }
-        html.claro .border-ouro\/30, html.claro .border-ouro\/40, html.claro .border-ouro\/60 { border-color: rgba(161, 98, 7, .45); }
+        html.claro .text-ouro, html.claro .hover\:text-ouro:hover { color: #E6C700; }
+        html.claro .text-ouro\/70 { color: rgba(230, 199, 0, .8); }
+        html.claro .text-ouro\/90 { color: rgba(230, 199, 0, .95); }
+        html.claro .bg-ouro\/10 { background-color: rgba(252, 252, 48, .18); }
+        html.claro .hover\:bg-ouro\/10:hover, html.claro .hover\:bg-ouro\/20:hover { background-color: rgba(252, 252, 48, .3); }
+        html.claro .border-ouro\/30, html.claro .border-ouro\/40, html.claro .border-ouro\/60 { border-color: rgba(230, 199, 0, .7); }
         html.claro .text-rose-300, html.claro .text-rose-400 { color: #e11d48; }
         html.claro .shadow-black { --tw-shadow-color: rgba(0, 0, 0, .12); }
         html.claro .bg-ouro .text-ouro, html.claro .bg-ouro.text-ouro { color: #0b8a3b; }
         html.claro .bg-verde.text-white { color: #fff; }
+        html.claro .shadow-black\/40 { --tw-shadow-color: rgba(0, 0, 0, .15); }
+        html.claro svg circle[stroke="#0a1f13"] { stroke: #fff; }
         /* gráfico (cores fixas no SVG) */
         html.claro svg line[stroke="#1c4630"] { stroke: #e2e8f0; }
-        html.claro svg line[stroke="#FCFC30"] { stroke: #ca8a04; }
+        html.claro svg line[stroke="#FCFC30"] { stroke: #E6C700; }
         html.claro svg [fill="#94a3b8"] { fill: #64748b; }
         html.claro svg [stroke="#3BD777"] { stroke: #0b8a3b; }
         html.claro svg [fill="#3BD777"] { fill: #0b8a3b; }
@@ -84,13 +86,13 @@
                 <div class="min-w-0">
                     <h1 class="text-[24px] font-black tracking-tight leading-none text-verde-claro whitespace-nowrap">COTA CEA<span class="text-ouro">$</span>A</h1>
                 </div>
-                <!-- Tema: sol = mudar para claro; lua = mudar para escuro -->
-                <button onclick="alternarTema()" id="btn-tema" title="Fundo claro" aria-label="Alternar fundo claro/escuro" class="text-ouro hover:opacity-80 w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-opacity">
-                    <i id="ico-tema" class="fa-solid fa-sun"></i>
-                </button>
             </div>
 
             <div class="flex items-center space-x-2">
+                <!-- Tema: sol = mudar para claro; lua = mudar para escuro -->
+                <button onclick="alternarTema()" id="btn-tema" title="Fundo claro" aria-label="Alternar fundo claro/escuro" class="bg-mata-800 hover:bg-mata-700 border border-mata-700 text-ouro w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors">
+                    <i id="ico-tema" class="fa-solid fa-sun"></i>
+                </button>
                 <button onclick="abrirModalAuth('login')" id="btn-conta" title="Entrar" class="bg-ouro hover:bg-ouro-escuro text-mata-950 font-semibold w-10 h-10 rounded-xl text-sm transition-colors duration-200 flex items-center justify-center shadow-sm">
                     <i class="fa-solid fa-user"></i>
                 </button>
@@ -111,7 +113,7 @@
         <section id="vista-lista" class="space-y-4">
         <div class="flex flex-col items-stretch gap-3">
             <!-- Grupo de produtos e localidade: lado a lado, mesmo estilo -->
-            <div class="grid grid-cols-2 gap-3">
+            <div id="filtros-lista" class="grid grid-cols-2 gap-3 transition-opacity">
                 <div class="relative">
                     <select id="select-categoria" aria-label="Grupo de produtos" onchange="filtrarCategoria(this.value)" class="w-full appearance-none bg-mata-800 text-slate-200 text-sm font-medium rounded-xl border border-mata-700 pl-3.5 pr-9 py-2.5 focus:ring-2 focus:ring-ouro focus:outline-none cursor-pointer truncate">
                         <option value="todos">📦 Tipos de produtos</option>
@@ -127,13 +129,13 @@
                     <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-ouro text-xs pointer-events-none"></i>
                 </div>
 
+                <!-- Local: várias praças podem ser marcadas para comparar -->
                 <div class="relative">
-                    <select id="select-mercado" aria-label="Localidade" onchange="alterarMercado(this.value)" class="w-full appearance-none bg-mata-800 text-slate-200 text-sm font-medium rounded-xl border border-mata-700 pl-3.5 pr-9 py-2.5 focus:ring-2 focus:ring-ouro focus:outline-none cursor-pointer truncate">
-                        <option value="ES">📍 CEASA - Vitória (ES)</option>
-                        <option value="SP">📍 CEASA - São Paulo (SP)</option>
-                        <option value="MG">📍 CEASA - Belo Horizonte (MG)</option>
-                    </select>
+                    <button id="btn-mercado" type="button" onclick="abrirMercados(event)" aria-haspopup="true" aria-label="Locais" class="w-full text-left bg-mata-800 text-slate-200 text-sm font-medium rounded-xl border border-mata-700 pl-3.5 pr-9 py-2.5 focus:ring-2 focus:ring-ouro focus:outline-none cursor-pointer">
+                        <span id="btn-mercado-rot" class="block truncate">📍 Local</span>
+                    </button>
                     <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-ouro text-xs pointer-events-none"></i>
+                    <div id="pop-mercados" class="hidden absolute right-0 top-full mt-1.5 w-72 max-w-[calc(100vw-2rem)] z-40 bg-mata-900 border border-mata-700 rounded-xl shadow-xl shadow-black/40 p-1.5"></div>
                 </div>
             </div>
 

@@ -10,20 +10,24 @@ const PERIODOS = [
     { rot: '3 meses', dias: 91 },
     { rot: '1 ano', dias: 365 }
 ];
-const periodosDe = mid => PERIODOS.filter(p => !p.so || p.so === mid);
+const periodosDe = ids => PERIODOS.filter(p => !p.so || ids.every(id => id === p.so));
+// cor de cada praça nos gráficos de comparação (boa leitura no fundo claro e no escuro)
+const CORES = ['#22c55e', '#3b82f6', '#f97316', '#ec4899', '#a855f7', '#14b8a6', '#eab308', '#ef4444'];
+const corMercado = id => CORES[Math.max(0, dados.mercados.findIndex(m => m.id === id)) % CORES.length];
+const nomeCurto = m => m.nome.replace(/^CEASA\s*-\s*/i, '');
 
 let dados = null;               // { gerado_em, mercados, itens }
 let favoritos = [];
 let categoriaAtual = 'todos';
-let mercadoAtual = 'ES';
+let mercadosSel = ['ES'];       // praças marcadas no filtro de local (uma ou mais)
 let apenasFavoritos = false;
 let periodoDias = 7;            // abre em 1 semana (ES) ou 1 mês (demais)
-let det = null;                 // { key } quando a tela de detalhe está aberta
+let det = null;                 // { key, mercs } quando a tela de detalhe está aberta
 let scrollLista = 0;
 
 // ---------- preferências (por usuário, ou do aparelho se não houver login) ----------
 function salvarPrefs() {
-    const p = { favs: favoritos, mercado: mercadoAtual };
+    const p = { favs: favoritos, mercados: mercadosSel, mercado: mercadosSel[0] };
     if (Auth.usuario()) Auth.gravarPrefs(p); else gravarLS(LS_ANON, p);
 }
 function carregarPrefs() {
@@ -31,15 +35,16 @@ function carregarPrefs() {
         ? (Auth.lerPrefs() || {})
         : lerLS(LS_ANON, { favs: lerLS('favs_ceasa_v2', []), mercado: lerLS('mercado_ceasa', 'ES') });
     favoritos = Array.isArray(p.favs) ? p.favs : [];
-    mercadoAtual = p.mercado || 'ES';
+    mercadosSel = Array.isArray(p.mercados) && p.mercados.length ? p.mercados : [p.mercado || 'ES'];
     if (dados) {
         const chaves = new Set(dados.itens.map(i => i.k));
         favoritos = favoritos.filter(k => chaves.has(k));
-        if (!dados.mercados.some(m => m.id === mercadoAtual)) mercadoAtual = dados.mercados[0].id;
+        mercadosSel = dados.mercados.map(m => m.id).filter(id => mercadosSel.includes(id));   // ordem do site
+        if (!mercadosSel.length) mercadosSel = [dados.mercados[0].id];
     }
 }
 // chamadas pelo auth.js
-function aoCriarUsuario() { return { favs: favoritos, mercado: mercadoAtual }; }
+function aoCriarUsuario() { return { favs: favoritos, mercados: mercadosSel, mercado: mercadosSel[0] }; }
 function aoMudarUsuario() {
     carregarPrefs();
     apenasFavoritos = false;
@@ -55,15 +60,52 @@ function sincronizarUI() {
         ? `<span class="font-black text-base leading-none">${esc(u.nome.trim().charAt(0).toUpperCase() || '?')}</span>`
         : '<i class="fa-solid fa-user"></i>';
     b.title = u ? 'Minha conta' : 'Entrar';
-    el('select-mercado').value = mercadoAtual;
+    atualizarBotaoMercados();
 }
 
 // ---------- dados ----------
 // A lista de localidades vem do dados.json: cada CEASA coletada aparece sozinha
+// O filtro de local aceita várias praças (caixas de marcar) para comparar preços
 function montarMercados() {
-    el('select-mercado').innerHTML = dados.mercados
-        .map(m => `<option value="${esc(m.id)}">📍 ${esc(m.nome)}</option>`).join('');
+    el('pop-mercados').innerHTML = `
+        <p class="px-3 pt-2 pb-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Locais (marque um ou mais)</p>
+        ${dados.mercados.map(m => `
+        <label class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-mata-800 cursor-pointer text-sm text-slate-200">
+            <input type="checkbox" value="${esc(m.id)}" onchange="marcarMercado(this)" class="w-4 h-4 accent-[#FCFC30] shrink-0">
+            <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${corMercado(m.id)}"></span>
+            <span class="truncate">${esc(m.nome)}</span>
+        </label>`).join('')}
+        <button onclick="fecharMercados()" class="w-full mt-1 bg-ouro text-mata-950 font-bold rounded-lg py-2 text-sm">Pronto</button>`;
 }
+function atualizarBotaoMercados() {
+    const b = el('btn-mercado-rot');
+    if (!b) return;
+    const ms = dados ? mercadosSel.map(mercadoPor).filter(Boolean) : [];
+    b.textContent = apenasFavoritos ? '📍 Todos os locais'
+        : ms.length === 1 ? '📍 ' + nomeCurto(ms[0])
+        : ms.length ? '📍 ' + (ms.length <= 3 ? ms.map(m => m.id).join(', ') : `${ms.length} locais`) : '📍 Local';
+    el('pop-mercados').querySelectorAll('input').forEach(c => { c.checked = mercadosSel.includes(c.value); });
+}
+function abrirMercados(ev) {
+    ev.stopPropagation();
+    if (apenasFavoritos) return;
+    atualizarBotaoMercados();
+    el('pop-mercados').classList.toggle('hidden');
+}
+function fecharMercados() { el('pop-mercados').classList.add('hidden'); }
+function marcarMercado(cx) {
+    const id = cx.value;
+    const novo = cx.checked ? [...mercadosSel, id] : mercadosSel.filter(x => x !== id);
+    if (!novo.length) { cx.checked = true; return; }   // pelo menos um local
+    mercadosSel = dados.mercados.map(m => m.id).filter(x => novo.includes(x));
+    salvarPrefs();
+    atualizarBotaoMercados();
+    renderizarGrid();
+}
+document.addEventListener('click', (e) => {
+    const p = el('pop-mercados');
+    if (p && !p.classList.contains('hidden') && !p.contains(e.target)) fecharMercados();
+});
 
 const mercadoPor = (id) => dados.mercados.find(m => m.id === id);
 const itemPorChave = (k) => dados.itens.find(i => i.k === k);
@@ -135,17 +177,25 @@ function renderizarGrid() {
     if (!dados) return;
     const grid = el('grid-produtos');
     const busca = norm(el('input-busca').value.trim());
-    const mercado = mercadoPor(mercadoAtual);
+    // nos favoritos valem todas as praças, sem filtro de grupo ou local (só a busca por texto)
+    const ms = apenasFavoritos ? dados.mercados.map(m => m.id) : mercadosSel;
 
     const filtrados = dados.itens.filter(i => {
-        if (!i.m[mercadoAtual]) return false;
-        if (apenasFavoritos && !favoritos.includes(i.k)) return false;
+        if (apenasFavoritos) return favoritos.includes(i.k) && casaBusca(i, busca);
+        const em = ms.filter(id => i.m[id]);
+        if (!em.length) return false;
         if (categoriaAtual !== 'todos' && i.g !== categoriaAtual) return false;
-        if (!busca && !favoritos.includes(i.k) && frescor(i, mercadoAtual).muitoVelho) return false;   // dado velho demais
+        if (!busca && !favoritos.includes(i.k) && em.every(id => frescor(i, id).muitoVelho)) return false;   // dado velho demais
         return casaBusca(i, busca);
     });
 
-    el('info-boletim').innerHTML = `<i class="fa-regular fa-calendar mr-1 text-ouro"></i>Cotação de <strong class="text-slate-200">${dataBR(mercado.data, true)}</strong>`;
+    const merc = ms.map(mercadoPor);
+    el('info-boletim').innerHTML = `<i class="fa-regular fa-calendar mr-1 text-ouro"></i>` + (merc.length === 1
+        ? `Cotação de <strong class="text-slate-200">${dataBR(merc[0].data, true)}</strong>`
+        : `Cotações: ${merc.map(m => `<strong class="text-slate-200">${m.id}</strong> ${dataCurta(m.data)}`).join(' · ')}`);
+    el('filtros-lista').classList.toggle('opacity-40', apenasFavoritos);   // grupo e local não valem nos favoritos
+    el('select-categoria').disabled = apenasFavoritos;
+    atualizarBotaoMercados();
     el('info-contagem').textContent = `${filtrados.length} ${filtrados.length === 1 ? 'produto' : 'produtos'}`;
     el('fav-count-badge').textContent = favoritos.length;
     const btnFav = el('btn-fav-header');
@@ -168,19 +218,58 @@ function renderizarGrid() {
     el('estado-vazio').classList.add('hidden');
 
     const frag = document.createDocumentFragment();
-    filtrados.forEach(i => frag.appendChild(criarCard(i, mercado)));
+    filtrados.forEach(i => frag.appendChild(criarCard(i, ms.filter(id => i.m[id]))));
     grid.appendChild(frag);
 }
 
 const ESTRELA = (cheia, tam = 'w-6 h-6') => `<svg viewBox="0 0 24 24" class="${tam}" fill="${cheia ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 2.5l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 17.5l-5.9 3.2 1.2-6.6L2.5 9.5l6.6-.9z"/></svg>`;
 
-function criarCard(item, mercado) {
-    const c = item.m[mercadoAtual];
-    const { c: varPct, pts } = variacao(item, mercadoAtual);
+// Mais de uma praça: um bloco de preço por praça, para comparar
+function criarCardMulti(item, ids) {
+    const isFav = favoritos.includes(item.k);
+    const detalhe = item.d.replace(/\bLonga Vida\b/g, 'LV');
+    const apoio = [UNIDADE[item.u], item.e !== 'kg' ? esc(item.e) : ''].filter(Boolean).join(' · ');
+    const blocos = ids.map(id => {
+        const c = item.m[id], m = mercadoPor(id), fr = frescor(item, id), { c: vp } = variacao(item, id);
+        const data = c.dt && c.dt !== m.data ? `<span class="text-ouro text-[10px] font-bold ml-1"><i class="fa-regular fa-clock"></i> ${dataCurta(c.dt)}</span>` : '';
+        return `<div class="bg-mata-950 border border-mata-800 rounded-lg px-2 py-1.5 min-w-0 ${fr.velho ? 'opacity-60' : ''}">
+            <span class="text-[11px] font-bold text-slate-300 flex items-center gap-1 whitespace-nowrap"><span class="w-2 h-2 rounded-full shrink-0" style="background:${corMercado(id)}"></span>${esc(id)}${data}</span>
+            <span class="block text-[15px] font-bold whitespace-nowrap leading-tight mt-0.5 ${fr.velho ? 'text-slate-500' : 'text-verde-claro'}">R$ ${preco(c.com)}</span>${varMini(vp)}
+        </div>`;
+    }).join('');
+    const card = document.createElement('div');
+    card.dataset.act = 'abrir';
+    card.dataset.arg = item.k;
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', `Ver histórico de ${item.p} ${item.d}`);
+    card.className = 'bg-mata-900 border border-mata-800 rounded-xl pl-1.5 pr-3 py-2 flex items-start gap-2 hover:border-verde/60 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ouro';
+    card.innerHTML = `
+        <button data-act="fav" data-arg="${esc(item.k)}" aria-pressed="${isFav}" aria-label="${isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}" class="${isFav ? 'text-ouro' : 'text-ouro/70 hover:text-ouro'} transition-colors p-2 shrink-0">${ESTRELA(isFav, 'w-5 h-5')}</button>
+        <div class="min-w-0 flex-1 pt-1">
+            <h3 class="font-bold text-white text-[15px] leading-tight">${esc(item.p)}${detalhe ? ` <span class="font-semibold text-slate-300">${esc(detalhe)}</span>` : ''}</h3>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-snug">${apoio}</p>
+            <div class="grid grid-cols-3 gap-1.5 mt-2">${blocos}</div>
+        </div>`;
+    return card;
+}
+// variação compacta (texto colorido, sem fundo) para os blocos por praça
+function varMini(c) {
+    if (c == null || !isFinite(c)) return '';
+    const k = c > 0.05 ? 'up' : c < -0.05 ? 'dn' : 'fl';
+    const cls = { up: 'text-verde-claro', dn: 'text-rose-400', fl: 'text-slate-400' }[k];
+    return `<span class="block text-[10px] font-bold leading-tight ${cls}">${k === 'up' ? '▲ +' : k === 'dn' ? '▼ −' : '■ '}${Math.abs(c).toFixed(1).replace('.', ',')}%</span>`;
+}
+
+function criarCard(item, ids) {
+    if (ids.length > 1) return criarCardMulti(item, ids);
+    const mid = ids[0], mercado = mercadoPor(mid);
+    const c = item.m[mid];
+    const { c: varPct, pts } = variacao(item, mid);
     const isFav = favoritos.includes(item.k);
     const detalhe = item.d.replace(/\bLonga Vida\b/g, 'LV');   // abreviação para caber na linha
     const sit = c.s;
-    const fr = frescor(item, mercadoAtual), velho = fr.velho;
+    const fr = frescor(item, mid), velho = fr.velho;
     const tom = velho ? 'text-slate-500' : sit === 'firme' ? 'text-verde-claro' : sit === 'fraco' ? 'text-rose-400' : 'text-slate-400';
     // linha de apoio: unidade · embalagem · situação do mercado · (cotação antiga)
     const apoio = [
@@ -198,9 +287,10 @@ function criarCard(item, mercado) {
     card.setAttribute('role', 'button');
     card.setAttribute('aria-label', `Ver histórico de ${item.p} ${item.d}`);
     card.className = 'bg-mata-900 border border-mata-800 rounded-xl pl-1.5 pr-3 py-2 flex items-center gap-2 hover:border-verde/60 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ouro';
+    const tagLocal = apenasFavoritos ? `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 mr-1"><span class="w-2 h-2 rounded-full" style="background:${corMercado(mid)}"></span>${esc(mid)}</span>` : '';
     card.innerHTML = `
         <button data-act="fav" data-arg="${esc(item.k)}" aria-pressed="${isFav}" aria-label="${isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}" class="${isFav ? 'text-ouro' : 'text-ouro/70 hover:text-ouro'} transition-colors p-2 shrink-0">${ESTRELA(isFav, 'w-5 h-5')}</button>
-        <div class="min-w-0 flex-1">
+        <div class="min-w-0 flex-1">${tagLocal ? `<div>${tagLocal}</div>` : ''}
             <h3 class="font-bold ${velho ? 'text-slate-400' : 'text-white'} text-[15px] leading-tight">${esc(item.p)}${detalhe ? ` <span class="font-semibold ${velho ? 'text-slate-500' : 'text-slate-300'}">${esc(detalhe)}</span>` : ''}</h3>
             <p class="text-[11px] ${velho ? 'text-slate-500' : 'text-slate-400'} mt-0.5 leading-snug">${apoio}</p>
         </div>
@@ -221,9 +311,12 @@ function mostrarVista(qual) {
 function abrirDetalhe(key) {
     const it = itemPorChave(key);
     if (!it) return;
-    if (!it.m[mercadoAtual]) mercadoAtual = Object.keys(it.m)[0];
+    // abre com as mesmas praças mostradas no card (nos favoritos: todas as que têm o produto)
+    const todas = dados.mercados.map(m => m.id).filter(id => it.m[id]);
+    let mercs = apenasFavoritos ? todas : mercadosSel.filter(id => it.m[id]);
+    if (!mercs.length) mercs = todas.slice(0, 1);
     scrollLista = window.scrollY;
-    det = { key };
+    det = { key, mercs };
     history.pushState({ det: key }, '');
     mostrarVista('detalhe');
     renderDetalhe();
@@ -239,11 +332,29 @@ function voltar() {
 }
 window.addEventListener('popstate', () => { if (det) fecharDetalhe(); });
 
+// Botões de praça do detalhe: marcar/desmarcar para incluir no gráfico de comparação
+function botoesPracas(it) {
+    return `<div class="flex flex-wrap gap-1.5 bg-mata-900 border border-mata-800 rounded-2xl p-1.5" role="group" aria-label="Praças no gráfico">
+        ${dados.mercados.filter(x => it.m[x.id]).map(x => {
+            const on = det.mercs.includes(x.id);
+            return `<button data-act="merc" data-arg="${x.id}" aria-pressed="${on}" title="${esc(x.nome)}" class="flex-1 basis-[22%] py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 ${on ? 'bg-ouro text-mata-950' : 'text-slate-300 hover:bg-mata-800'}"><span class="w-2.5 h-2.5 rounded-full" style="background:${corMercado(x.id)}"></span>${x.id}</button>`;
+        }).join('')}
+    </div>
+    ${Object.keys(it.m).length > 1 ? '<p class="text-xs text-slate-500 -mt-2 px-1">Toque nas praças para comparar no gráfico.</p>' : ''}`;
+}
+function botoesPeriodo(pers, per) {
+    return `<div class="flex flex-wrap gap-1.5" role="group" aria-label="Período do gráfico">
+            ${pers.map(p => `<button data-act="per" data-arg="${p.dias}" aria-pressed="${p === per}" class="flex-none px-2.5 py-1.5 rounded-full text-xs font-semibold border whitespace-nowrap transition-colors ${p === per ? 'bg-ouro text-mata-950 border-ouro' : 'bg-mata-900 text-slate-300 border-mata-700 hover:border-verde/60'}">${p.rot}</button>`).join('')}
+            <button data-act="mais" class="flex-none px-2.5 py-1.5 rounded-full text-xs font-semibold border border-ouro/60 text-ouro whitespace-nowrap hover:bg-ouro/10 transition-colors"><i class="fa-solid fa-lock mr-1 text-[10px]"></i>Mais dados sob consulta</button>
+        </div>`;
+}
+
 function renderDetalhe() {
+    if (det.mercs.length > 1) return renderDetalheMulti();
     const y = window.scrollY;
-    const it = itemPorChave(det.key), mid = mercadoAtual, m = it.m[mid], merc = mercadoPor(mid);
+    const it = itemPorChave(det.key), mid = det.mercs[0], m = it.m[mid], merc = mercadoPor(mid);
     const { a, c, pts } = variacao(it, mid);
-    const pers = periodosDe(mid);
+    const pers = periodosDe([mid]);
     const per = pers.find(p => p.dias === periodoDias) || pers[0];
     const ultimo = pts[pts.length - 1].d;
     let w = per.dias ? pts.filter(p => p.d >= somarDias(ultimo, -per.dias)) : pts;
@@ -268,9 +379,7 @@ function renderDetalhe() {
             <p class="text-xs text-slate-500 mt-0.5">Cotação de ${dataBR(merc.data, true)}${m.dt ? ` · última cotação deste item: ${dataBR(m.dt)}` : ''}</p>
         </div>
 
-        <div class="flex flex-wrap gap-1.5 bg-mata-900 border border-mata-800 rounded-2xl p-1.5" role="group" aria-label="Localidade">
-            ${dados.mercados.filter(x => it.m[x.id]).map(x => `<button data-act="merc" data-arg="${x.id}" class="flex-1 basis-[22%] py-2.5 rounded-xl text-sm font-semibold transition-colors ${x.id === mid ? 'bg-ouro text-mata-950' : 'text-slate-300 hover:bg-mata-800'}">${x.id}</button>`).join('')}
-        </div>
+        ${botoesPracas(it)}
 
         <div>
             <div class="flex items-baseline gap-2"><span class="text-5xl font-bold text-verde-claro leading-none">${R$(m.com)}</span><span class="text-slate-400">${UNIDADE[it.u].replace('R$', '')}</span></div>
@@ -279,10 +388,7 @@ function renderDetalhe() {
             ${c != null && Math.abs(c) > 50 ? '<div class="mt-3 bg-ouro/10 text-ouro border border-ouro/30 rounded-xl px-3 py-2.5 text-sm"><i class="fa-solid fa-triangle-exclamation mr-1.5"></i>Variação muito acima do normal. Confira este preço antes de decidir.</div>' : ''}
         </div>
 
-        <div class="flex flex-wrap gap-1.5" role="group" aria-label="Período do gráfico">
-            ${pers.map(p => `<button data-act="per" data-arg="${p.dias}" aria-pressed="${p === per}" class="flex-none px-2.5 py-1.5 rounded-full text-xs font-semibold border whitespace-nowrap transition-colors ${p === per ? 'bg-ouro text-mata-950 border-ouro' : 'bg-mata-900 text-slate-300 border-mata-700 hover:border-verde/60'}">${p.rot}</button>`).join('')}
-            <button data-act="mais" class="flex-none px-2.5 py-1.5 rounded-full text-xs font-semibold border border-ouro/60 text-ouro whitespace-nowrap hover:bg-ouro/10 transition-colors"><i class="fa-solid fa-lock mr-1 text-[10px]"></i>Mais dados sob consulta</button>
-        </div>
+        ${botoesPeriodo(pers, per)}
 
         <div class="${box}">
             ${Graf.desenhar(w)}
@@ -300,6 +406,75 @@ function renderDetalhe() {
     window.scrollTo(0, y);
 }
 
+// Detalhe comparando várias praças: preço atual de cada uma, gráfico com uma linha por praça e tabela
+function renderDetalheMulti() {
+    const y = window.scrollY;
+    const it = itemPorChave(det.key), ids = det.mercs;
+    const pers = periodosDe(ids);
+    const per = pers.find(p => p.dias === periodoDias) || pers[0];
+    const fim = ids.map(id => { const p = serie(it, id); return p[p.length - 1].d; }).sort().pop();
+    const ini = somarDias(fim, -per.dias);
+    const series = ids.map(id => {
+        const pts = serie(it, id);
+        let w = pts.filter(p => p.d >= ini);
+        if (!w.length) w = pts.slice(-1);
+        return { id, cor: corMercado(id), pts: w };
+    });
+    const fav = favoritos.includes(it.k);
+    const detalhe = it.d.replace(/\bLonga Vida\b/g, 'LV');
+    const sub = [UNIDADE[it.u], it.e !== 'kg' ? it.e : ''].filter(Boolean).join(' · ');
+    const box = 'bg-mata-900 border border-mata-800 rounded-2xl p-4';
+    const est = series.map(s => {
+        const v = s.pts.map(p => p.v);
+        return { mn: Math.min(...v), mx: Math.max(...v), md: v.reduce((a, b) => a + b, 0) / v.length };
+    });
+    const cab = ids.map(id => `<th class="text-right pb-2 font-bold text-slate-300 text-sm"><span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:${corMercado(id)}"></span>${id}</span></th>`).join('');
+    const linha = (rot, f, first) => `<tr class="${first ? '' : 'border-t border-mata-800'}"><td class="py-2.5 text-slate-300 pr-2">${rot}</td>${ids.map((id, k) => `<td class="text-right font-bold text-white whitespace-nowrap pl-2">${f(id, k)}</td>`).join('')}</tr>`;
+    const r = per.rot.toLowerCase();
+
+    el('vista-detalhe').innerHTML = `
+        <div class="flex items-center justify-between">
+            <button data-act="voltar" class="text-slate-200 hover:text-white font-semibold py-2 pr-3 -ml-1"><i class="fa-solid fa-arrow-left mr-1.5"></i>Voltar</button>
+            <button data-act="fav" data-arg="${esc(it.k)}" aria-pressed="${fav}" aria-label="${fav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}" class="${fav ? 'text-ouro' : 'text-ouro/70 hover:text-ouro'} p-1">${ESTRELA(fav)}</button>
+        </div>
+
+        <div>
+            <h2 class="text-2xl font-bold text-white leading-tight">${esc(it.p)}${detalhe ? ` <span class="font-semibold text-slate-300">${esc(detalhe)}</span>` : ''}</h2>
+            <p class="text-sm text-slate-400 mt-1">${esc(sub)} · comparando ${ids.length} praças</p>
+        </div>
+
+        ${botoesPracas(it)}
+
+        <div class="grid grid-cols-2 gap-2">
+            ${ids.map(id => {
+                const m = it.m[id], merc = mercadoPor(id), { c } = variacao(it, id), fr = frescor(it, id);
+                return `<div class="${box} !p-3 ${fr.velho ? 'opacity-70' : ''}">
+                    <p class="text-xs font-semibold text-slate-400 flex items-center gap-1.5 truncate"><span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${corMercado(id)}"></span>${esc(nomeCurto(merc))}</p>
+                    <p class="text-2xl font-bold text-verde-claro leading-tight mt-1">${R$(m.com)}</p>
+                    <div class="mt-1 flex items-center gap-1.5 flex-wrap">${chipVar(c)}<span class="text-[11px] ${fr.velho ? 'text-ouro font-bold' : 'text-slate-500'}">${dataCurta(fr.dt)}</span></div>
+                </div>`;
+            }).join('')}
+        </div>
+
+        ${botoesPeriodo(pers, per)}
+
+        <div class="${box}">
+            ${Graf.multi(series)}
+            <p class="text-xs text-slate-500 mt-1">Passe o cursor ou deslize o dedo no gráfico para ver o preço de cada praça no dia.</p>
+        </div>
+
+        <div class="${box} overflow-x-auto">
+            <table class="w-full text-[15px]">
+                <tr><th></th>${cab}</tr>
+                ${linha(`Menor (${r})`, (id, k) => preco(est[k].mn), true)}
+                ${linha(`Maior (${r})`, (id, k) => preco(est[k].mx))}
+                ${linha(`Média (${r})`, (id, k) => preco(est[k].md))}
+                ${linha('Mín. – Máx. do dia', id => `${preco(it.m[id].min)}–${preco(it.m[id].max)}`)}
+            </table>
+        </div>`;
+    window.scrollTo(0, y);
+}
+
 // ---------- ações ----------
 function toggleFavorito(chave) {
     favoritos = favoritos.includes(chave) ? favoritos.filter(k => k !== chave) : [...favoritos, chave];
@@ -307,6 +482,7 @@ function toggleFavorito(chave) {
     if (det) renderDetalhe(); else { const y = window.scrollY; renderizarGrid(); window.scrollTo(0, y); }
 }
 function toggleFiltroFavoritos() {
+    fecharMercados();
     if (det) fecharDetalhe(true);
     apenasFavoritos = !apenasFavoritos;
     renderizarGrid();
@@ -320,11 +496,13 @@ function limparFiltros() {
     renderizarGrid();
 }
 function filtrarCategoria(cat) { categoriaAtual = cat; renderizarGrid(); }
-function alterarMercado(id) {
-    mercadoAtual = id;
-    salvarPrefs();
-    el('select-mercado').value = id;
-    if (det) renderDetalhe(); else renderizarGrid();
+// detalhe: inclui/retira uma praça do gráfico (sempre fica pelo menos uma)
+function alternarPracaDetalhe(id) {
+    const on = det.mercs.includes(id);
+    if (on && det.mercs.length === 1) return;
+    const novo = on ? det.mercs.filter(x => x !== id) : [...det.mercs, id];
+    det.mercs = dados.mercados.map(m => m.id).filter(x => novo.includes(x));
+    renderDetalhe();
 }
 function filtrarProdutos() { renderizarGrid(); }
 
@@ -366,7 +544,7 @@ document.addEventListener('click', (e) => {
         case 'fav': toggleFavorito(arg); break;
         case 'abrir': abrirDetalhe(arg); break;
         case 'voltar': voltar(); break;
-        case 'merc': alterarMercado(arg); break;
+        case 'merc': alternarPracaDetalhe(arg); break;
         case 'mais': abrirFolha(`
             <div class="p-6 pt-16 text-center">
                 <div class="bg-mata-900 border border-ouro/40 rounded-2xl p-6">
