@@ -48,7 +48,7 @@ jobs:
     timeout-minutes: 120
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url || steps.deploy2.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -121,6 +121,19 @@ jobs:
         with:
           path: docs
 
+      # O GitHub às vezes demora a "enxergar" o pacote recém-enviado ("No artifacts named
+      # github-pages"). Espera um pouco antes de publicar e, se falhar, tenta mais uma vez.
+      - if: ${{ inputs.discover == '' && !inputs.diagnostico }}
+        run: sleep 15
+
       - id: deploy
         if: ${{ inputs.discover == '' && !inputs.diagnostico }}
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - if: ${{ steps.deploy.outcome == 'failure' }}
+        run: sleep 60
+
+      - id: deploy2
+        if: ${{ steps.deploy.outcome == 'failure' }}
         uses: actions/deploy-pages@v4
