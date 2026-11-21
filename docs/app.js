@@ -15,6 +15,9 @@ const periodosDe = ids => PERIODOS.filter(p => !p.so || ids.every(id => id === p
 const CORES = ['#22c55e', '#3b82f6', '#f97316', '#ec4899', '#a855f7', '#14b8a6', '#eab308', '#ef4444'];
 const corMercado = id => CORES[Math.max(0, dados.mercados.findIndex(m => m.id === id)) % CORES.length];
 const nomeCurto = m => m.nome.replace(/^CEASA\s*-\s*/i, '');
+const cidade = id => nomeCurto(mercadoPor(id)).replace(/\s*\([^)]*\)\s*$/, '');   // 'Vitória (ES)' -> 'Vitória'
+// nome da cidade na pastilha de preço (favoritos misturam praças)
+const etiquetaCidade = (id, extra = '') => `<span class="flex items-start gap-1 text-[10px] font-bold text-slate-300 leading-tight min-w-0 ${extra}"><span class="w-2 h-2 rounded-full shrink-0 mt-px" style="background:${corMercado(id)}"></span><span>${esc(cidade(id))}</span></span>`;
 
 let dados = null;               // { gerado_em, mercados, itens }
 let favoritos = [];
@@ -232,7 +235,9 @@ function criarCardMulti(item, ids) {
         const c = item.m[id], m = mercadoPor(id), fr = frescor(item, id), { c: vp } = variacao(item, id);
         const data = c.dt && c.dt !== m.data ? `<span class="text-ouro text-[10px] font-bold ml-1"><i class="fa-regular fa-clock"></i> ${dataCurta(c.dt)}</span>` : '';
         return `<div class="bg-mata-950 border border-mata-800 rounded-lg px-2 py-1.5 min-w-0 ${fr.velho ? 'opacity-60' : ''}">
-            <span class="text-[11px] font-bold text-slate-300 flex items-center gap-1 whitespace-nowrap"><span class="w-2 h-2 rounded-full shrink-0" style="background:${corMercado(id)}"></span>${esc(id)}${data}</span>
+            ${apenasFavoritos
+                ? etiquetaCidade(id) + (data ? `<span class="block -ml-1 leading-tight">${data}</span>` : '')
+                : `<span class="text-[11px] font-bold text-slate-300 flex items-center gap-1 whitespace-nowrap"><span class="w-2 h-2 rounded-full shrink-0" style="background:${corMercado(id)}"></span>${esc(id)}${data}</span>`}
             <span class="block text-[15px] font-bold whitespace-nowrap leading-tight mt-0.5 ${fr.velho ? 'text-slate-500' : 'text-verde-claro'}">R$ ${preco(c.com)}</span>${varMini(vp)}
         </div>`;
     }).join('');
@@ -286,15 +291,15 @@ function criarCard(item, ids) {
     card.setAttribute('role', 'button');
     card.setAttribute('aria-label', `Ver histórico de ${item.p} ${item.d}`);
     card.className = 'bg-mata-900 border border-mata-800 rounded-xl pl-1.5 pr-3 py-2 flex items-center gap-2 hover:border-verde/60 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ouro';
-    const tagLocal = apenasFavoritos ? `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 mr-1"><span class="w-2 h-2 rounded-full" style="background:${corMercado(mid)}"></span>${esc(mid)}</span>` : '';
     card.innerHTML = `
         <button data-act="fav" data-arg="${esc(item.k)}" aria-pressed="${isFav}" aria-label="${isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}" class="${isFav ? 'text-ouro' : 'text-ouro/70 hover:text-ouro'} transition-colors p-2 shrink-0">${ESTRELA(isFav, 'w-5 h-5')}</button>
-        <div class="min-w-0 flex-1">${tagLocal ? `<div>${tagLocal}</div>` : ''}
+        <div class="min-w-0 flex-1">
             <h3 class="font-bold ${velho ? 'text-slate-400' : 'text-white'} text-[15px] leading-tight">${esc(item.p)}${detalhe ? ` <span class="font-semibold ${velho ? 'text-slate-500' : 'text-slate-300'}">${esc(detalhe)}</span>` : ''}</h3>
             <p class="text-[11px] ${velho ? 'text-slate-500' : 'text-slate-400'} mt-0.5 leading-snug">${apoio}</p>
         </div>
         ${Graf.mini(pts.slice(-22).map(p => p.v), velho)}
         <div class="text-right shrink-0 min-w-[78px]">
+            ${apenasFavoritos ? etiquetaCidade(mid, 'justify-end mb-1') : ''}
             <div class="text-lg font-bold ${velho ? 'text-slate-500' : 'text-verde-claro'} leading-none">R$ ${preco(c.com)}</div>
             <div class="mt-1 ${velho ? 'opacity-50' : ''}">${chipVar(varPct)}</div>
         </div>`;
