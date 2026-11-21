@@ -193,8 +193,7 @@ function renderizarGrid() {
     el('info-boletim').innerHTML = `<i class="fa-regular fa-calendar mr-1 text-ouro"></i>` + (merc.length === 1
         ? `Cotação de <strong class="text-slate-200">${dataBR(merc[0].data, true)}</strong>`
         : `Cotações: ${merc.map(m => `<strong class="text-slate-200">${m.id}</strong> ${dataCurta(m.data)}`).join(' · ')}`);
-    el('filtros-lista').classList.toggle('opacity-40', apenasFavoritos);   // grupo e local não valem nos favoritos
-    el('select-categoria').disabled = apenasFavoritos;
+    el('filtros-lista').classList.toggle('hidden', apenasFavoritos);   // grupo e local não valem nos favoritos
     atualizarBotaoMercados();
     el('info-contagem').textContent = `${filtrados.length} ${filtrados.length === 1 ? 'produto' : 'produtos'}`;
     el('fav-count-badge').textContent = favoritos.length;
