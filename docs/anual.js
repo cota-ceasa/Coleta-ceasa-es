@@ -8,8 +8,8 @@
 const ANUAL = {
     ANOS: 6,          // atual + 5 anteriores
     HORIZ: 12,        // semanas de previsão
-    // escala do amarelo (ano atual) ao verde (ano mais antigo)
-    DE: [242, 214, 0], ATE: [21, 128, 61],
+    // escala do verde (ano atual, linha mais grossa) ao amarelo (ano mais antigo, mais fina)
+    DE: [21, 160, 61], ATE: [242, 214, 0],
     ocultos: new Set(),
 };
 
