@@ -168,7 +168,7 @@ const Graf = {
 
         let o = `<div class="flex flex-wrap gap-1.5 mb-2" role="group" aria-label="Anos no gráfico">${A.anos.map((a, k) => {
             const on = !ocultos.has(a);
-            return `<button data-act="anual-ano" data-arg="${a}" aria-pressed="${on}" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs font-bold transition-colors ${on ? 'border-mata-700 text-slate-200' : 'border-mata-800 text-slate-500 line-through'}" style="opacity:${on ? opAno(k) : 0.6}"><span class="w-3 h-1 rounded-full" style="background:${corAno(k)}"></span>${a}</button>`;
+            return `<button data-act="anual-ano" data-arg="${a}" aria-pressed="${on}" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs font-bold transition-colors ${on ? 'border-mata-700 text-slate-200' : 'border-mata-800 text-slate-500 line-through'}" style="opacity:${on ? opAno(k) : 0.6}"><span class="w-3 rounded-full" style="background:${corAno(k)};height:${espAno(k)}px"></span>${a}</button>`;
         }).join('')}</div>`;
         o += `<div id="ga-info" aria-live="polite" class="min-h-[44px]">${this.infoA(Math.min(A.w0, 51))}</div>`;
         o += `<svg id="ga-svg" viewBox="0 0 ${W} ${H}" width="100%" style="touch-action:pan-y;display:block;cursor:crosshair" role="img" aria-label="Preço semanal de cada ano sobreposto" onpointermove="Graf.hoverA(event)" onpointerdown="Graf.hoverA(event)" onpointerleave="if(event.pointerType==='mouse')Graf.sairA()">`;
@@ -199,7 +199,7 @@ const Graf = {
             if (seg.length) segs.push(seg);
             segs.forEach(sg => {
                 o += sg.length > 1
-                    ? `<polyline fill="none" stroke="${corAno(k)}" stroke-opacity="${opAno(k)}" stroke-width="${k === 0 ? 3 : 1.6}" stroke-linejoin="round" stroke-linecap="round" points="${sg.join(' ')}"/>`
+                    ? `<polyline fill="none" stroke="${corAno(k)}" stroke-opacity="${opAno(k)}" stroke-width="${espAno(k)}" stroke-linejoin="round" stroke-linecap="round" points="${sg.join(' ')}"/>`
                     : `<circle cx="${sg[0].split(',')[0]}" cy="${sg[0].split(',')[1]}" r="2" fill="${corAno(k)}" fill-opacity="${opAno(k)}"/>`;
             });
         });

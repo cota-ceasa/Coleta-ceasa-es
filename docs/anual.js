@@ -8,7 +8,8 @@
 const ANUAL = {
     ANOS: 6,          // atual + 5 anteriores
     HORIZ: 12,        // semanas de previsão
-    CORES: ['#22c55e', '#3b82f6', '#a855f7', '#f97316', '#ec4899', '#14b8a6'],
+    // escala do amarelo (ano atual) ao verde (ano mais antigo)
+    DE: [242, 214, 0], ATE: [21, 128, 61],
     ocultos: new Set(),
 };
 
@@ -66,8 +67,12 @@ function calcularAnual(it, mid) {
     return { sem, anos, atual, w0, p0, ult, proj, usados: [...usados].sort((a, b) => b - a), resumo };
 }
 
-function corAno(k) { return ANUAL.CORES[k % ANUAL.CORES.length]; }
-function opAno(k) { return Math.max(0.3, 1 - 0.1 * k); }   // atual 100%, depois 90%, 80%...
+function corAno(k) {
+    const t = Math.min(1, k / (ANUAL.ANOS - 1));
+    return '#' + ANUAL.DE.map((c, i) => Math.round(c + (ANUAL.ATE[i] - c) * t).toString(16).padStart(2, '0')).join('');
+}
+function opAno(k) { return Math.max(0.3, 1 - 0.1 * k); }            // atual 100%, depois 90%, 80%...
+function espAno(k) { return Math.max(1.2, 3.6 - 0.5 * k); }         // atual mais grossa, as outras afinando
 
 function renderAnual() {
     const y = window.scrollY;
