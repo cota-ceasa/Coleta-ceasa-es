@@ -149,6 +149,96 @@ const Graf = {
         el('gm-info').innerHTML = this.infoM(c.n - 1);
     },
 
+    // Anos sobrepostos (eixo X = semanas do ano, jan–dez) + previsão. A = calcularAnual(...)
+    anual(A, ocultos) {
+        const W = 320, H = 200, ml = 42, mr = 10, mt = 8, mb = 24;
+        const vis = A.anos.map((a, k) => ({ a, k })).filter(o => !ocultos.has(o.a));
+        const proj = A.proj;
+        // se a previsão passa de dezembro, o eixo continua pelo começo do ano seguinte
+        const wMax = Math.max(51, ...proj.map(p => p.w));
+        const val = (a, w) => w <= 51 ? A.sem[a][w] : ((A.sem[a + 1] || [])[w - 52] ?? null);
+        const vals = vis.flatMap(o => [...Array(wMax + 1).keys()].map(w => o.a === A.atual && w > 51 ? null : val(o.a, w)).filter(v => v != null))
+            .concat(ocultos.has(A.atual) ? [] : proj.flatMap(p => [p.lo, p.hi]));
+        let mn = vals.length ? Math.min(...vals) : 0, mx = vals.length ? Math.max(...vals) : 1;
+        const pd = (mx - mn) * 0.1 || 0.1;
+        mn -= pd; mx += pd;
+        const x = (w) => ml + w * (W - ml - mr) / wMax;
+        const y = (v) => H - mb - (v - mn) / (mx - mn) * (H - mb - mt);
+        this.estA = { A, vis, proj, W, ml, mr, x, y, wMax, val };
+
+        let o = `<div class="flex flex-wrap gap-1.5 mb-2" role="group" aria-label="Anos no gráfico">${A.anos.map((a, k) => {
+            const on = !ocultos.has(a);
+            return `<button data-act="anual-ano" data-arg="${a}" aria-pressed="${on}" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs font-bold transition-colors ${on ? 'border-mata-700 text-slate-200' : 'border-mata-800 text-slate-500 line-through'}" style="opacity:${on ? opAno(k) : 0.6}"><span class="w-3 h-1 rounded-full" style="background:${corAno(k)}"></span>${a}</button>`;
+        }).join('')}</div>`;
+        o += `<div id="ga-info" aria-live="polite" class="min-h-[44px]">${this.infoA(Math.min(A.w0, 51))}</div>`;
+        o += `<svg id="ga-svg" viewBox="0 0 ${W} ${H}" width="100%" style="touch-action:pan-y;display:block;cursor:crosshair" role="img" aria-label="Preço semanal de cada ano sobreposto" onpointermove="Graf.hoverA(event)" onpointerdown="Graf.hoverA(event)" onpointerleave="if(event.pointerType==='mouse')Graf.sairA()">`;
+        [0, 0.5, 1].forEach(t => {
+            const v = mn + (mx - mn) * t;
+            o += `<line x1="${ml}" x2="${W - mr}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="#1c4630"/>` +
+                 `<text x="${ml - 5}" y="${(y(v) + 4).toFixed(1)}" font-size="11" text-anchor="end" fill="#94a3b8">${v.toFixed(2).replace('.', ',')}</text>`;
+        });
+        // meses no eixo X (e os do ano seguinte, se o eixo passar de dezembro)
+        'JFMAMJJASONDJFMA'.split('').forEach((l, m) => {
+            const w = (new Date(2001, m, 1) - new Date(2001, 0, 1)) / 864e5 / 7 + 2;
+            if (w <= wMax) o += `<text x="${x(w).toFixed(1)}" y="${H - 7}" font-size="11" text-anchor="middle" fill="${m > 11 ? '#FCFC30' : '#94a3b8'}">${l}</text>`;
+        });
+        if (wMax > 51) o += `<line x1="${x(51.5).toFixed(1)}" x2="${x(51.5).toFixed(1)}" y1="${mt}" y2="${H - mb}" stroke="#94a3b8" stroke-opacity="0.5" stroke-dasharray="2 3"/>`;
+        // faixa e linha da previsão (só o trecho dentro do ano)
+        if (proj.length && !ocultos.has(A.atual)) {
+            const base = { w: A.w0, v: A.sem[A.atual][A.w0] ?? A.p0 };
+            const cima = [{ w: base.w, v: base.v }, ...proj.map(p => ({ w: p.w, v: p.hi }))];
+            const baixo = [...proj.map(p => ({ w: p.w, v: p.lo }))].reverse().concat([{ w: base.w, v: base.v }]);
+            o += `<polygon points="${cima.concat(baixo).map(p => `${x(p.w).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')}" fill="${corAno(0)}" fill-opacity="0.15"/>`;
+            o += `<polyline fill="none" stroke="${corAno(0)}" stroke-width="2.5" stroke-dasharray="5 4" points="${[base, ...proj].map(p => `${x(p.w).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')}"/>`;
+        }
+        // anos: do mais antigo para o atual (o atual fica por cima)
+        [...vis].reverse().forEach(({ a, k }) => {
+            const s = [...Array(wMax + 1).keys()].map(w => a === A.atual && w > 51 ? null : val(a, w));
+            let seg = [], segs = [];
+            s.forEach((v, w) => { if (v != null) seg.push(`${x(w).toFixed(1)},${y(v).toFixed(1)}`); else if (seg.length) { segs.push(seg); seg = []; } });
+            if (seg.length) segs.push(seg);
+            segs.forEach(sg => {
+                o += sg.length > 1
+                    ? `<polyline fill="none" stroke="${corAno(k)}" stroke-opacity="${opAno(k)}" stroke-width="${k === 0 ? 3 : 1.6}" stroke-linejoin="round" stroke-linecap="round" points="${sg.join(' ')}"/>`
+                    : `<circle cx="${sg[0].split(',')[0]}" cy="${sg[0].split(',')[1]}" r="2" fill="${corAno(k)}" fill-opacity="${opAno(k)}"/>`;
+            });
+        });
+        o += `<line id="ga-lin" x1="0" x2="0" y1="${mt}" y2="${H - mb}" stroke="#94a3b8" stroke-dasharray="3 3" visibility="hidden"/>`;
+        return o + '</svg>';
+    },
+
+    infoA(w) {
+        const c = this.estA, A = c.A;
+        const d = new Date(A.atual, 0, 1 + 7 * w, 12);
+        const p = c.proj.find(q => q.w === w);
+        const itens = c.vis.map(({ a, k }) => {
+            const v = a === A.atual && w > 51 ? null : c.val(a, w);
+            return `<span class="inline-flex items-center gap-1 text-sm" style="opacity:${opAno(k)}"><span class="w-2 h-2 rounded-full" style="background:${corAno(k)}"></span><span class="text-slate-400 text-xs font-semibold">${a}</span><b class="text-white">${v != null ? preco(v) : '–'}</b></span>`;
+        });
+        if (p && !ocultosAtual()) itens.push(`<span class="inline-flex items-center gap-1 text-sm"><span class="text-ouro text-xs font-bold">previsão</span><b class="text-white">${preco(p.v)}</b><span class="text-[11px] text-slate-500">(${preco(p.lo)}–${preco(p.hi)})</span></span>`);
+        return `<div class="text-xs text-slate-400 mb-1">Semana de ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} · R$</div><div class="flex flex-wrap gap-x-3 gap-y-1">${itens.join('')}</div>`;
+
+        function ocultosAtual() { return ANUAL.ocultos.has(A.atual); }
+    },
+
+    hoverA(e) {
+        const c = this.estA;
+        if (!c) return;
+        const r = el('ga-svg').getBoundingClientRect();
+        const px = (e.clientX - r.left) / r.width * c.W;
+        const w = Math.max(0, Math.min(c.wMax, Math.round((px - c.ml) / ((c.W - c.ml - c.mr) / c.wMax))));
+        const l = el('ga-lin');
+        l.setAttribute('x1', c.x(w)); l.setAttribute('x2', c.x(w)); l.setAttribute('visibility', 'visible');
+        el('ga-info').innerHTML = this.infoA(w);
+    },
+
+    sairA() {
+        const c = this.estA;
+        if (!c) return;
+        el('ga-lin').setAttribute('visibility', 'hidden');
+        el('ga-info').innerHTML = this.infoA(Math.min(c.A.w0, 51));
+    },
+
     // Mini-gráfico para os cards
     mini(v, apagado) {
         if (v.length < 2) return '';

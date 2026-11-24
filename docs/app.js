@@ -334,7 +334,10 @@ function fecharDetalhe(semScroll) {
 function voltar() {
     if (history.state && history.state.det) history.back(); else fecharDetalhe();
 }
-window.addEventListener('popstate', () => { if (det) fecharDetalhe(); });
+window.addEventListener('popstate', () => {
+    if (!det) return;
+    if (det.anual) fecharAnual(); else fecharDetalhe();   // análise anual -> volta ao detalhe
+});
 
 // Botões de praça do detalhe: marcar/desmarcar para incluir no gráfico de comparação
 function botoesPracas(it) {
@@ -406,7 +409,8 @@ function renderDetalhe() {
                 <tr class="border-t border-mata-800"><td class="py-2.5 text-slate-300">Média (${per.rot.toLowerCase()})</td><td class="text-right font-bold text-white">${R$(md)}</td></tr>
                 <tr class="border-t border-mata-800"><td class="py-2.5 text-slate-300">Mín. – Máx. do dia</td><td class="text-right font-bold text-white">${preco(m.min)} – ${preco(m.max)}</td></tr>
             </table>
-        </div>`;
+        </div>
+        <button data-act="anual" class="w-full bg-mata-900 border border-ouro/60 hover:bg-ouro/10 text-ouro font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 transition-colors"><i class="fa-solid fa-chart-line"></i>Análise anualizada e previsão de preços</button>`;
     window.scrollTo(0, y);
 }
 
@@ -475,7 +479,8 @@ function renderDetalheMulti() {
                 ${linha(`Média (${r})`, (id, k) => preco(est[k].md))}
                 ${linha('Mín. – Máx. do dia', id => `${preco(it.m[id].min)}–${preco(it.m[id].max)}`)}
             </table>
-        </div>`;
+        </div>
+        <button data-act="anual" class="w-full bg-mata-900 border border-ouro/60 hover:bg-ouro/10 text-ouro font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 transition-colors"><i class="fa-solid fa-chart-line"></i>Análise anualizada e previsão de preços</button>`;
     window.scrollTo(0, y);
 }
 
@@ -483,7 +488,7 @@ function renderDetalheMulti() {
 function toggleFavorito(chave) {
     favoritos = favoritos.includes(chave) ? favoritos.filter(k => k !== chave) : [...favoritos, chave];
     salvarPrefs();
-    if (det) renderDetalhe(); else { const y = window.scrollY; renderizarGrid(); window.scrollTo(0, y); }
+    if (det) (det.anual ? renderAnual : renderDetalhe)(); else { const y = window.scrollY; renderizarGrid(); window.scrollTo(0, y); }
 }
 function toggleFiltroFavoritos() {
     fecharMercados();
@@ -549,6 +554,9 @@ document.addEventListener('click', (e) => {
         case 'abrir': abrirDetalhe(arg); break;
         case 'voltar': voltar(); break;
         case 'merc': alternarPracaDetalhe(arg); break;
+        case 'anual': abrirAnual(); break;
+        case 'anual-merc': det.anual.mid = arg; renderAnual(); break;
+        case 'anual-ano': alternarAnoAnual(arg); break;
         case 'mais': abrirFolha(`
             <div class="p-6 pt-16 text-center">
                 <div class="bg-mata-900 border border-ouro/40 rounded-2xl p-6">
