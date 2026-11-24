@@ -1,0 +1,77 @@
+name: Monitor de horário dos boletins
+
+# Abre a página de cada CEASA a cada 10 min (seg-sex, 05:20-21:00 de Brasília) e grava no banco
+# quando aparece boletim novo. Cada execução agendada cobre uma janela de até 6 h.
+# Relatório: Run workflow com "relatorio" marcado (tabela no resumo da execução).
+on:
+  schedule:
+    - cron: "20 8 * * 1-5"    # 05:20 -> 11:20
+    - cron: "20 14 * * 1-5"   # 11:20 -> 17:20
+    - cron: "20 20 * * 1-5"   # 17:20 -> 21:00
+  workflow_dispatch:
+    inputs:
+      relatorio:
+        description: "Gerar a tabela de horários (em vez de monitorar)"
+        type: boolean
+        default: false
+      desde:
+        description: "Relatório a partir de (AAAA-MM-DD). Vazio = últimos 15 dias"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: monitor-${{ inputs.relatorio && 'relatorio' || 'coleta' }}
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências Python
+        run: pip install -r requirements.txt
+
+      - name: Versão do Playwright
+        if: ${{ !inputs.relatorio }}
+        id: pwv
+        run: echo "v=$(python -c 'import importlib.metadata as m;print(m.version("playwright"))')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache do navegador
+        if: ${{ !inputs.relatorio }}
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pwv.outputs.v }}
+
+      - name: Instalar navegador
+        if: ${{ !inputs.relatorio }}
+        run: |
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            python -m playwright install-deps chromium
+          else
+            python -m playwright install --with-deps chromium
+          fi
+
+      - name: Monitorar
+        if: ${{ !inputs.relatorio }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PYTHONUNBUFFERED: "1"
+        run: python -m coleta.monitor
+
+      - name: Relatório
+        if: ${{ inputs.relatorio }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python -m coleta.monitor --relatorio ${{ inputs.desde && format('--desde {0}', inputs.desde) || '' }}
