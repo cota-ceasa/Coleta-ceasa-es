@@ -29,7 +29,19 @@ function semanasPorAno(pts) {
         acc[a][w].push(v);
     });
     const out = {};
-    for (const a in acc) out[a] = acc[a].map(l => l.length ? l.reduce((x, y) => x + y, 0) / l.length : null);
+    for (const a in acc) out[a] = semTrechosCurtos(acc[a].map(l => l.length ? l.reduce((x, y) => x + y, 0) / l.length : null));
+    return out;
+}
+// semanas isoladas (trecho com menos de 3 semanas seguidas) viram vazio: são pontos perdidos
+const SEM_MIN = 3;
+function semTrechosCurtos(s) {
+    const out = [...s];
+    let ini = null;
+    for (let w = 0; w <= s.length; w++) {
+        if (w < s.length && s[w] != null) { if (ini == null) ini = w; continue; }
+        if (ini != null && w - ini < SEM_MIN) for (let k = ini; k < w; k++) out[k] = null;
+        ini = null;
+    }
     return out;
 }
 // valor da semana w do ano a (w pode passar de 51: vai para o ano seguinte); tolera 1 semana vazia
@@ -164,7 +176,7 @@ function renderAnual() {
             ${pracas.map(x => `<button data-act="anual-merc" data-arg="${x.id}" aria-pressed="${x.id === mid}" class="flex-1 basis-[22%] py-2.5 rounded-xl text-sm font-semibold transition-colors ${x.id === mid ? 'bg-ouro text-mata-950' : 'text-slate-300 hover:bg-mata-800'}">${x.id}</button>`).join('')}
         </div>` : ''}
 
-        <div class="${box}">
+        <div class="${box} sempre-escuro">
             ${Graf.anual(A, ANUAL.ocultos)}
             <p class="text-xs text-slate-500 mt-2">Médias semanais do preço comum. Toque nos anos para mostrar ou esconder. Tracejado: previsão; faixa: menor e maior caso dos anos anteriores. ${A.proj.some(p => p.w > 51) ? 'Meses em amarelo: começo do ano seguinte.' : ''}</p>
         </div>
