@@ -199,7 +199,7 @@ const Graf = {
             const cima = [{ w: base.w, v: base.v }, ...proj.map(p => ({ w: p.w, v: p.hi }))];
             const baixo = [...proj.map(p => ({ w: p.w, v: p.lo }))].reverse().concat([{ w: base.w, v: base.v }]);
             o += `<polygon points="${cima.concat(baixo).map(p => `${x(p.w).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')}" fill="${corAno(0)}" fill-opacity="0.15"/>`;
-            o += `<polyline fill="none" stroke="${corAno(0)}" stroke-width="2.5" stroke-dasharray="5 4" points="${[base, ...proj].map(p => `${x(p.w).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')}"/>`;
+            o += `<polyline fill="none" stroke="${corAno(0)}" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="0.1 4.5" points="${[base, ...proj].map(p => `${x(p.w).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')}"/>`;
         }
         // fora de safra: onde e com que preço a próxima safra costuma começar
         if (A.proxima) {   // na semana do calendário em que a safra costuma recomeçar

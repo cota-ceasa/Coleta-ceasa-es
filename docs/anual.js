@@ -140,7 +140,7 @@ function corAno(k) {
     return `hsl(${(h1 + (h2 - h1) * f).toFixed(0)} ${(s1 + (s2 - s1) * f).toFixed(0)}% ${(l1 + (l2 - l1) * f).toFixed(0)}%)`;
 }
 function opAno() { return 1; }                                       // cor cheia em todos os anos
-function espAno(k) { return 3.6 - 2.6 * posAno(k); }                // atual 3,6 px ... mais antigo 1 px
+function espAno() { return 1.6; }                                   // mesma espessura fina em todos os anos (pouca sobreposição)
 
 function renderAnual() {
     const y = window.scrollY;
@@ -180,7 +180,7 @@ function renderAnual() {
 
         <div class="${box} sempre-escuro">
             ${Graf.anual(A, ANUAL.ocultos)}
-            <p class="text-xs text-slate-500 mt-2">Médias semanais do preço comum. Toque nos anos para mostrar ou esconder. Tracejado: previsão; faixa: menor e maior caso dos anos anteriores. ${A.proj.some(p => p.w > 51) ? 'Meses em amarelo: começo do ano seguinte.' : ''}</p>
+            <p class="text-xs text-slate-500 mt-2">Médias semanais do preço comum. Toque nos anos para mostrar ou esconder. Pontilhado: previsão; faixa: menor e maior caso dos anos anteriores. ${A.proj.some(p => p.w > 51) ? 'Meses em amarelo: começo do ano seguinte.' : ''}</p>
         </div>
 
         <div class="${box}">
