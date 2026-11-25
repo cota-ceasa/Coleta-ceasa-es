@@ -5,7 +5,6 @@ const LS_ANON = 'cc-anon';  // preferências de quem não entrou (favoritos, mer
 
 const UNIDADE = { kg: 'R$/kg', dz: 'R$/dúzia', un: 'R$/un' };
 const PERIODOS = [
-    { rot: '1 semana', dias: 7, so: 'ES' },   // só Vitória tem boletim todo dia útil
     { rot: '1 mês', dias: 30 },
     { rot: '3 meses', dias: 91 },
     { rot: '1 ano', dias: 365 }
@@ -24,7 +23,7 @@ let favoritos = [];
 let categoriaAtual = 'todos';
 let mercadosSel = ['ES'];       // praças marcadas no filtro de local (uma ou mais)
 let apenasFavoritos = false;
-let periodoDias = 7;            // abre em 1 semana (ES) ou 1 mês (demais)
+let periodoDias = 30;           // abre em 1 mês
 let det = null;                 // { key, mercs } quando a tela de detalhe está aberta
 let scrollLista = 0;
 
