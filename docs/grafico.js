@@ -163,15 +163,24 @@ const Graf = {
         let mn = vals.length ? Math.min(...vals) : 0, mx = vals.length ? Math.max(...vals) : 1;
         const pd = (mx - mn) * 0.1 || 0.1;
         mn -= pd; mx += pd;
-        const x = (w) => ml + w * (W - ml - mr) / wMax;
+        // eixo X só nos meses com dados (destaca a safra): da 1ª à última semana com cotação ou previsão
+        const temDado = (w) => vis.some(o => !(o.a === A.atual && w > 51) && val(o.a, w) != null) || proj.some(p => p.w === w);
+        let wIni = 0, wFim = wMax;
+        while (wIni < wMax && !temDado(wIni)) wIni++;
+        while (wFim > wIni && !temDado(wFim)) wFim--;
+        if (A.proxima) { wIni = Math.min(wIni, A.proxima.w % 52); wFim = Math.max(wFim, A.proxima.w % 52); }
+        wIni = Math.max(0, wIni - 1); wFim = Math.min(wMax, wFim + 1);
+        if (wFim - wIni < 4) { wIni = 0; wFim = wMax; }
+        const x = (w) => ml + (w - wIni) * (W - ml - mr) / (wFim - wIni);
         const y = (v) => H - mb - (v - mn) / (mx - mn) * (H - mb - mt);
-        this.estA = { A, vis, proj, W, ml, mr, x, y, wMax, val };
+        const wPadrao = Math.max(wIni, Math.min(wFim, A.w0));
+        this.estA = { A, vis, proj, W, ml, mr, x, y, wMax, wIni, wFim, wPadrao, val };
 
         let o = `<div class="flex flex-wrap gap-1.5 mb-2" role="group" aria-label="Anos no gráfico">${A.anos.map((a, k) => {
             const on = !ocultos.has(a);
             return `<button data-act="anual-ano" data-arg="${a}" aria-pressed="${on}" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs font-bold transition-colors ${on ? 'border-mata-700 text-slate-200' : 'border-mata-800 text-slate-500 line-through'}" style="opacity:${on ? opAno(k) : 0.6}"><span class="w-3 rounded-full" style="background:${corAno(k)};height:${espAno(k)}px"></span>${a}</button>`;
         }).join('')}</div>`;
-        o += `<div id="ga-info" aria-live="polite" class="min-h-[44px]">${this.infoA(Math.min(A.w0, 51))}</div>`;
+        o += `<div id="ga-info" aria-live="polite" class="min-h-[44px]">${this.infoA(wPadrao)}</div>`;
         o += `<svg id="ga-svg" viewBox="0 0 ${W} ${H}" width="100%" style="touch-action:pan-y;display:block;cursor:crosshair" role="img" aria-label="Preço semanal de cada ano sobreposto" onpointermove="Graf.hoverA(event)" onpointerdown="Graf.hoverA(event)" onpointerleave="if(event.pointerType==='mouse')Graf.sairA()">`;
         [0, 0.5, 1].forEach(t => {
             const v = mn + (mx - mn) * t;
@@ -181,9 +190,9 @@ const Graf = {
         // meses no eixo X (e os do ano seguinte, se o eixo passar de dezembro)
         'JFMAMJJASONDJFMA'.split('').forEach((l, m) => {
             const w = (new Date(2001, m, 1) - new Date(2001, 0, 1)) / 864e5 / 7 + 2;
-            if (w <= wMax) o += `<text x="${x(w).toFixed(1)}" y="${H - 7}" font-size="11" text-anchor="middle" fill="${m > 11 ? '#F0F02A' : '#94a3b8'}">${l}</text>`;
+            if (w >= wIni - 1 && w <= wFim + 1) o += `<text x="${x(w).toFixed(1)}" y="${H - 7}" font-size="11" text-anchor="middle" fill="${m > 11 ? '#F0F02A' : '#94a3b8'}">${l}</text>`;
         });
-        if (wMax > 51) o += `<line x1="${x(51.5).toFixed(1)}" x2="${x(51.5).toFixed(1)}" y1="${mt}" y2="${H - mb}" stroke="#94a3b8" stroke-opacity="0.5" stroke-dasharray="2 3"/>`;
+        if (wFim > 51) o += `<line x1="${x(51.5).toFixed(1)}" x2="${x(51.5).toFixed(1)}" y1="${mt}" y2="${H - mb}" stroke="#94a3b8" stroke-opacity="0.5" stroke-dasharray="2 3"/>`;
         // faixa e linha da previsão (só o trecho dentro do ano)
         if (proj.length && !ocultos.has(A.atual)) {
             const base = { w: A.w0, v: (A.sem[+A.ult.d.slice(0, 4)] || [])[A.w0] ?? A.p0 };
@@ -234,7 +243,7 @@ const Graf = {
         if (!c) return;
         const r = el('ga-svg').getBoundingClientRect();
         const px = (e.clientX - r.left) / r.width * c.W;
-        const w = Math.max(0, Math.min(c.wMax, Math.round((px - c.ml) / ((c.W - c.ml - c.mr) / c.wMax))));
+        const w = Math.max(c.wIni, Math.min(c.wFim, c.wIni + Math.round((px - c.ml) / ((c.W - c.ml - c.mr) / (c.wFim - c.wIni)))));
         const l = el('ga-lin');
         l.setAttribute('x1', c.x(w)); l.setAttribute('x2', c.x(w)); l.setAttribute('visibility', 'visible');
         el('ga-info').innerHTML = this.infoA(w);
@@ -244,7 +253,7 @@ const Graf = {
         const c = this.estA;
         if (!c) return;
         el('ga-lin').setAttribute('visibility', 'hidden');
-        el('ga-info').innerHTML = this.infoA(Math.min(c.A.w0, 51));
+        el('ga-info').innerHTML = this.infoA(c.wPadrao);
     },
 
     // Mini-gráfico para os cards
