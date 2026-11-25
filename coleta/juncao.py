@@ -123,6 +123,14 @@ def detectar(conn, aplicar=True):
         motivo = (f"antiga parou em {fim_a:%d/%m/%Y}; nova começou {gap:+d} dias depois; "
                   f"preço novo/antigo = {razao:.2f}")
         juncoes.append((ceasa, prod, det, emb, prod, d2, e2, fator, motivo))
+    if not aplicar:   # simulação: inventário de séries que pararam e que surgiram (para trocas com produto diferente)
+        inicio_geral = {c: min(p[0][0] for (c2, *_), p in series.items() if c2 == c) for c in fim_mercado}
+        for (ceasa, prod, det, emb), p in sorted(series.items(), key=lambda kv: kv[1][-1][0]):
+            if len(p) >= MIN_ANTIGA and (fim_mercado[ceasa] - p[-1][0]).days >= PAROU_DIAS:
+                print(f"[parou] {ceasa} {p[-1][0]:%Y-%m-%d} {prod} «{det}» [{emb}] {len(p)} cot. R$/un {p[-1][1]:.2f}")
+        for (ceasa, prod, det, emb), p in sorted(series.items(), key=lambda kv: kv[1][0][0]):
+            if len(p) >= MIN_NOVA and (p[0][0] - inicio_geral[ceasa]).days > 60:
+                print(f"[surgiu] {ceasa} {p[0][0]:%Y-%m-%d} {prod} «{det}» [{emb}] {len(p)} cot. R$/un {p[0][1]:.2f}")
     for j in juncoes:
         print(f"[junção] {j[0]} {j[1]} «{j[2]}» [{j[3]}] -> «{j[5]}» [{j[6]}] ({j[8]})")
     if aplicar and juncoes:
