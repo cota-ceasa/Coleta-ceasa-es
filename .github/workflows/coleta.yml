@@ -32,6 +32,10 @@ on:
         description: "Refazer a padronização dos boletins já baixados (sem baixar de novo)"
         type: boolean
         default: false
+      juncoes_simular:
+        description: "Só listar as séries que seriam juntadas por troca de nome (sem alterar o banco)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -93,6 +97,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           PYTHONUNBUFFERED: "1"
           INICIO: ${{ inputs.inicio }}
+          JUNCOES: ${{ inputs.juncoes_simular && 'simular' || 'aplicar' }}
           MAXIMO: ${{ inputs.max }}
           RENORMALIZAR: ${{ inputs.renormalizar }}
           PERFIL: ${{ inputs.perfil }}

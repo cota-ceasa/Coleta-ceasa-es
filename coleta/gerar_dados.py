@@ -123,6 +123,9 @@ def limpa_detalhe(d):
     return " ".join(out)
 
 
+DIAS_SEM_COTACAO = 365
+
+
 def gerar(df, saida, rotulos=None):
     """df: colunas Data, Mercado (id), Produto, Detalhe, Embalagem, Min, Com, Max, Sit, Conferência.
     Retorna True se gravou o arquivo."""
@@ -146,9 +149,13 @@ def gerar(df, saida, rotulos=None):
         mercados.append({"id": mid, "nome": rotulos.get(mid, mid), "data": iso[-1], "datas": iso})
     data_mercado = {m["id"]: m["data"] for m in mercados}
 
-    itens = {}
+    itens, velhas = {}, 0
     for (mid, prod, det, emb), g in df.groupby(["Mercado", "Produto", "det", "Embalagem"]):
         g = g.drop_duplicates("Data", keep="last")
+        # sem cotação há mais de 1 ano: provavelmente mudou de nome; não vai para o app
+        if (pd.Timestamp(data_mercado[mid]) - g["Data"].iloc[-1]).days > DIAS_SEM_COTACAO:
+            velhas += 1
+            continue
         un, div, rot = emb_info(emb)
         chave = f"{prod}|{det}|{emb}"
         it = itens.setdefault(chave, {"k": chave, "p": prod, "d": det, "g": grupo_de(prod),
@@ -170,6 +177,8 @@ def gerar(df, saida, rotulos=None):
            "mercados": mercados, "itens": lista}
     with open(saida, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+    if velhas:
+        print(f"{velhas} séries sem cotação há mais de {DIAS_SEM_COTACAO} dias ficaram fora do app")
     print(f"{len(lista)} itens, {sum(len(i['m']) for i in lista)} séries, "
           f"{len(mercados)} mercados -> {saida}")
     return True

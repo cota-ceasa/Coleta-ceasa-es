@@ -8,10 +8,11 @@ Uso:
 import argparse
 import datetime as dt
 import hashlib
+import os
 import sys
 from pathlib import Path
 
-from . import db
+from . import db, juncao
 from .ceasas import REGISTRO
 from .exportar import exportar
 
@@ -89,6 +90,7 @@ def coletar(c, page, conn, inicio, fim, maximo):
 
 def normalizar(conn, c):
     pend = db.pendentes_normalizacao(conn, c.id)
+    mapa = juncao.carregar(conn)   # nomes antigos já juntados a um nome novo
     n = 0
     for d in pend:
         brutas = db.linhas(conn, c.id, d)
@@ -99,7 +101,7 @@ def normalizar(conn, c):
         if cots is None:
             print(f"[{c.id}] parser ainda não implementado: {len(pend)} boletins aguardando normalização")
             return
-        db.gravar_cotacoes(conn, c.id, d, cots)
+        db.gravar_cotacoes(conn, c.id, d, juncao.aplicar_em(cots, c.id, mapa))
         n += 1
         log(f"[{c.id}] normalizado {d}: {len(cots)} cotações ({sum(1 for x in cots if x['conferencia'] == 'validado')} validadas)")
     if n:
@@ -180,7 +182,8 @@ def main():
 
     for c in alvo:
         normalizar(conn, c)
-    if not a.sem_exportar:
+    if not a.sem_exportar:   # só na nuvem, com todas as praças normalizadas
+        juncao.detectar(conn, aplicar=os.environ.get("JUNCOES", "aplicar") != "simular")
         exportar(conn, a.json)
     conn.close()
     return 1 if (falhas == len(alvo) and not a.renormalizar) else 0  # erro só se todas falharem (o GitHub avisa por e-mail)
