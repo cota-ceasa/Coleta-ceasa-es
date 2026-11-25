@@ -74,7 +74,7 @@ function montarMercados() {
         <p class="px-3 pt-2 pb-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Locais (marque um ou mais)</p>
         ${dados.mercados.map(m => `
         <label class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-mata-800 cursor-pointer text-sm text-slate-200">
-            <input type="checkbox" value="${esc(m.id)}" onchange="marcarMercado(this)" class="w-4 h-4 accent-[#F2D411] shrink-0">
+            <input type="checkbox" value="${esc(m.id)}" onchange="marcarMercado(this)" class="w-4 h-4 accent-[#F5DD32] shrink-0">
             <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${corMercado(m.id)}"></span>
             <span class="truncate">${esc(m.nome)}</span>
         </label>`).join('')}

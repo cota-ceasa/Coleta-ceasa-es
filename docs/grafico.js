@@ -28,7 +28,7 @@ const Graf = {
         });
         // linha tracejada no preço mais recente (referência: está alto ou baixo?)
         const yu = y(vals[n0 - 1]).toFixed(1);
-        o += `<line x1="${ml}" x2="${W - mr}" y1="${yu}" y2="${yu}" stroke="#F2D411" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.85"/>`;
+        o += `<line x1="${ml}" x2="${W - mr}" y1="${yu}" y2="${yu}" stroke="#F5DD32" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.85"/>`;
         if (n0 > 1) o += `<polyline fill="none" stroke="${cor}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" points="${linha(0, n0 - 1)}"/>`;
         o += `<circle cx="${x(n0 - 1).toFixed(1)}" cy="${y(vals[n0 - 1]).toFixed(1)}" r="4" fill="${cor}"/>` +
              `<line id="g-lin" x1="0" x2="0" y1="${mt}" y2="${H - mb}" stroke="#94a3b8" stroke-dasharray="3 3" visibility="hidden"/>` +
@@ -158,7 +158,8 @@ const Graf = {
         const wMax = Math.max(51, ...proj.map(p => p.w));
         const val = (a, w) => w <= 51 ? A.sem[a][w] : ((A.sem[a + 1] || [])[w - 52] ?? null);
         const vals = vis.flatMap(o => [...Array(wMax + 1).keys()].map(w => o.a === A.atual && w > 51 ? null : val(o.a, w)).filter(v => v != null))
-            .concat(ocultos.has(A.atual) ? [] : proj.flatMap(p => [p.lo, p.hi]));
+            .concat(ocultos.has(A.atual) ? [] : proj.flatMap(p => [p.lo, p.hi]))
+            .concat(A.proxima ? [A.proxima.lo, A.proxima.hi] : []);
         let mn = vals.length ? Math.min(...vals) : 0, mx = vals.length ? Math.max(...vals) : 1;
         const pd = (mx - mn) * 0.1 || 0.1;
         mn -= pd; mx += pd;
@@ -180,16 +181,23 @@ const Graf = {
         // meses no eixo X (e os do ano seguinte, se o eixo passar de dezembro)
         'JFMAMJJASONDJFMA'.split('').forEach((l, m) => {
             const w = (new Date(2001, m, 1) - new Date(2001, 0, 1)) / 864e5 / 7 + 2;
-            if (w <= wMax) o += `<text x="${x(w).toFixed(1)}" y="${H - 7}" font-size="11" text-anchor="middle" fill="${m > 11 ? '#F2D411' : '#94a3b8'}">${l}</text>`;
+            if (w <= wMax) o += `<text x="${x(w).toFixed(1)}" y="${H - 7}" font-size="11" text-anchor="middle" fill="${m > 11 ? '#F5DD32' : '#94a3b8'}">${l}</text>`;
         });
         if (wMax > 51) o += `<line x1="${x(51.5).toFixed(1)}" x2="${x(51.5).toFixed(1)}" y1="${mt}" y2="${H - mb}" stroke="#94a3b8" stroke-opacity="0.5" stroke-dasharray="2 3"/>`;
         // faixa e linha da previsão (só o trecho dentro do ano)
         if (proj.length && !ocultos.has(A.atual)) {
-            const base = { w: A.w0, v: A.sem[A.atual][A.w0] ?? A.p0 };
+            const base = { w: A.w0, v: (A.sem[+A.ult.d.slice(0, 4)] || [])[A.w0] ?? A.p0 };
             const cima = [{ w: base.w, v: base.v }, ...proj.map(p => ({ w: p.w, v: p.hi }))];
             const baixo = [...proj.map(p => ({ w: p.w, v: p.lo }))].reverse().concat([{ w: base.w, v: base.v }]);
             o += `<polygon points="${cima.concat(baixo).map(p => `${x(p.w).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')}" fill="${corAno(0)}" fill-opacity="0.15"/>`;
             o += `<polyline fill="none" stroke="${corAno(0)}" stroke-width="2.5" stroke-dasharray="5 4" points="${[base, ...proj].map(p => `${x(p.w).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')}"/>`;
+        }
+        // fora de safra: onde e com que preço a próxima safra costuma começar
+        if (A.proxima) {   // na semana do calendário em que a safra costuma recomeçar
+            const X = x(A.proxima.w % 52).toFixed(1);
+            o += `<line x1="${X}" x2="${X}" y1="${y(A.proxima.hi).toFixed(1)}" y2="${y(A.proxima.lo).toFixed(1)}" stroke="${corAno(0)}" stroke-width="3" stroke-linecap="round" stroke-opacity="0.5"/>` +
+                 `<circle cx="${X}" cy="${y(A.proxima.v).toFixed(1)}" r="4.5" fill="none" stroke="${corAno(0)}" stroke-width="2.5" stroke-dasharray="3 2"/>` +
+                 `<text x="${X}" y="${(y(A.proxima.hi) - 6).toFixed(1)}" font-size="10" font-weight="700" text-anchor="middle" fill="${corAno(0)}">próx. safra</text>`;
         }
         // anos: do mais antigo para o atual (o atual fica por cima)
         [...vis].reverse().forEach(({ a, k }) => {

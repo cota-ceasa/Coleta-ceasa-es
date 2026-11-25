@@ -9,7 +9,7 @@ const ANUAL = {
     ANOS: 6,          // atual + 5 anteriores
     HORIZ: 12,        // semanas de previsão
     // escala do verde (ano atual, linha mais grossa) ao amarelo (ano mais antigo, mais fina)
-    DE_HSL: [138, 77, 36], ATE_HSL: [52, 90, 51],   // #15A03D (verde) -> #F2D411 (amarelo do app)
+    DE_HSL: [138, 77, 36], ATE_HSL: [60, 97, 59],   // #15A03D (verde) -> #FCFC30 (amarelo-neon)
     ocultos: new Set(),
 };
 
@@ -41,30 +41,79 @@ function valorSemana(sem, a, w) {
     return null;
 }
 
+// Só sequências de pelo menos 4 cotações seguidas (dias de boletim consecutivos): pontos soltos,
+// como uma cotação isolada fora de safra, distorcem as médias e a previsão
+const SEQ_MIN = 4;
+function serieFiltrada(it, mid) {
+    const datas = mercadoPor(mid).datas, out = [];
+    let run = [];
+    const fecha = () => { if (run.length >= SEQ_MIN) out.push(...run); run = []; };
+    it.m[mid].h.forEach((v, i) => { if (v != null) run.push({ d: datas[i], v }); else fecha(); });
+    fecha();
+    return out;
+}
+const diasEntre = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5);
+
+// Safra de cada ano anterior = maior trecho de semanas com cotação (tolera 1 semana vazia)
+function safraDoAno(s) {
+    let melhor = null, ini = null, fim = null, vazias = 0;
+    s.forEach((v, w) => {
+        if (v != null) { if (ini == null) ini = w; fim = w; vazias = 0; }
+        else if (ini != null && ++vazias > 1) { if (!melhor || fim - ini > melhor[1] - melhor[0]) melhor = [ini, fim]; ini = null; vazias = 0; }
+    });
+    if (ini != null && (!melhor || fim - ini > melhor[1] - melhor[0])) melhor = [ini, fim];
+    return melhor;
+}
+
 function calcularAnual(it, mid) {
-    const pts = serie(it, mid);
+    const pts = serieFiltrada(it, mid);
+    if (!pts.length) return null;
     const sem = semanasPorAno(pts);
-    const ult = pts[pts.length - 1];
-    const atual = +ult.d.slice(0, 4), w0 = semanaDoAno(ult.d);
+    const hoje = mercadoPor(mid).data, ult = pts[pts.length - 1];
+    const atual = +hoje.slice(0, 4), wHoje = semanaDoAno(hoje);
     const anos = Object.keys(sem).map(Number).filter(a => a <= atual && a > atual - ANUAL.ANOS).sort((a, b) => b - a);
-    // previsão: razões (semana w0+h / semana w0) em cada ano anterior
-    const p0 = ult.v, proj = [];
-    const anteriores = anos.filter(a => a < atual);
+    const anteriores = anos.filter(a => a < +ult.d.slice(0, 4));
+    // produto sazonal? (algum ano anterior com menos de ~10 meses de cotação)
+    const safras = anteriores.map(a => safraDoAno(sem[a])).filter(Boolean);
+    const sazonal = safras.some(([i, f]) => f - i < 44);
+    const safraTipica = sazonal && safras.length >= 2
+        ? [Math.round(mediana(safras.map(x => x[0]))), Math.round(mediana(safras.map(x => x[1])))] : null;
+    const emSafra = diasEntre(ult.d, hoje) <= 14;   // cotado nas últimas 2 semanas
+
+    const proj = [];
+    let fimSafra = null, proxima = null;
+    const w0 = emSafra ? semanaDoAno(ult.d) : wHoje, p0 = ult.v;
     const usados = new Set();
-    for (let h = 1; h <= ANUAL.HORIZ; h++) {
-        const r = [];
-        anteriores.forEach(a => {
-            const b = valorSemana(sem, a, w0), f = valorSemana(sem, a, w0 + h);
-            if (b && f) { r.push(f / b); usados.add(a); }
+    if (emSafra) {
+        // previsão: variação semana a semana dos anos anteriores, até onde eles ainda tinham safra
+        const fimTipico = safraTipica && w0 <= safraTipica[1] ? safraTipica[1] : null;
+        for (let h = 1; h <= ANUAL.HORIZ; h++) {
+            if (fimTipico != null && w0 + h > fimTipico) { fimSafra = fimTipico; break; }   // para na safra típica
+            const r = [];
+            anteriores.forEach(a => {
+                const b = valorSemana(sem, a, w0), f = valorSemana(sem, a, w0 + h);
+                if (b && f) { r.push(f / b); usados.add(a); }
+            });
+            if (r.length < 2) { if (sazonal) fimSafra = w0 + h; break; }
+            proj.push({ h, w: w0 + h, v: p0 * mediana(r), lo: p0 * Math.min(...r), hi: p0 * Math.max(...r), n: r.length });
+        }
+    } else {
+        // fora de safra: quando a safra costumava recomeçar e com que preço
+        const ini = [], preco0 = [];
+        anos.filter(a => a < atual).forEach(a => {
+            for (let k = 1; k <= 52; k++) {
+                const v = valorSemana(sem, a, wHoje + k);
+                if (v) { ini.push(k); preco0.push(v); usados.add(a); break; }
+            }
         });
-        if (r.length >= 2) proj.push({ h, w: w0 + h, v: p0 * mediana(r), lo: p0 * Math.min(...r), hi: p0 * Math.max(...r), n: r.length });
+        if (ini.length >= 2) proxima = { w: wHoje + Math.round(mediana(ini)), v: mediana(preco0), lo: Math.min(...preco0), hi: Math.max(...preco0), n: ini.length };
     }
-    // resumo por ano: média, mín., máx. e o preço nesta mesma semana
     const resumo = anos.map(a => {
         const v = sem[a].filter(x => x != null);
-        return { a, md: v.reduce((x, y) => x + y, 0) / v.length, mn: Math.min(...v), mx: Math.max(...v), nesta: valorSemana(sem, a, w0), parcial: a === atual };
+        return { a, md: v.reduce((x, y) => x + y, 0) / v.length, mn: Math.min(...v), mx: Math.max(...v), nesta: valorSemana(sem, a, wHoje), parcial: a === atual };
     });
-    return { sem, anos, atual, w0, p0, ult, proj, usados: [...usados].sort((a, b) => b - a), resumo };
+    return { sem, anos, atual, w0, wHoje, p0, ult, proj, emSafra, sazonal, safraTipica, fimSafra, proxima,
+             usados: [...usados].sort((a, b) => b - a), resumo };
 }
 
 // transição pelo matiz (HSL): verde -> verde-limão -> amarelo, sem passar pelo oliva apagado
@@ -80,12 +129,21 @@ function renderAnual() {
     const y = window.scrollY;
     const it = itemPorChave(det.key), mid = det.anual.mid, merc = mercadoPor(mid);
     const A = calcularAnual(it, mid);
+    if (!A) {
+        el('vista-detalhe').innerHTML = `
+            <button data-act="voltar" class="text-slate-200 hover:text-white font-semibold py-2 pr-3 -ml-1"><i class="fa-solid fa-arrow-left mr-1.5"></i>Voltar</button>
+            <div class="bg-mata-900 border border-mata-800 rounded-2xl p-5 text-slate-300">Este produto não tem nenhuma sequência de pelo menos ${SEQ_MIN} cotações seguidas em ${esc(nomeCurto(merc))}, então não dá para analisar.</div>`;
+        return;
+    }
     const detalhe = it.d.replace(/\bLonga Vida\b/g, 'LV');
     const sub = [UNIDADE[it.u], it.e !== 'kg' ? it.e : ''].filter(Boolean).join(' · ');
     const box = 'bg-mata-900 border border-mata-800 rounded-2xl p-4';
     const pracas = dados.mercados.filter(x => it.m[x.id]);
-    const p4 = A.proj.find(p => p.h === 4), p8 = A.proj.find(p => p.h === 8), p12 = A.proj.find(p => p.h === 12);
-    const dataSem = (w) => { const d = inicioSemana(A.atual, w); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`; };
+    // linhas da tabela: 4, 8 e 12 semanas (ou a última semana antes do fim da safra)
+    const hs = [4, 8, 12].filter(h => A.proj.some(p => p.h === h));
+    const ultP = A.proj[A.proj.length - 1];
+    if (ultP && !hs.includes(ultP.h)) hs.push(ultP.h);
+    const dataSem = (w) => { const d = inicioSemana(+A.ult.d.slice(0, 4), w); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`; };
     const linhaProj = (rot, p) => p ? `<tr class="border-t border-mata-800"><td class="py-2.5 text-slate-300">${rot} <span class="text-slate-500 text-xs">(sem. de ${dataSem(p.w)})</span></td><td class="text-right font-bold text-white whitespace-nowrap">${R$(p.v)}</td><td class="text-right text-xs text-slate-400 whitespace-nowrap pl-2">${preco(p.lo)}–${preco(p.hi)}</td></tr>` : '';
 
     el('vista-detalhe').innerHTML = `
@@ -110,14 +168,19 @@ function renderAnual() {
 
         <div class="${box}">
             <h3 class="font-bold text-white mb-1">Previsão de preço</h3>
-            ${A.proj.length ? `
-            <p class="text-xs text-slate-400 mb-2">A partir de ${R$(A.p0)} (${dataCurta(A.ult.d)}), repetindo o comportamento de ${A.usados.join(', ')} nas mesmas semanas.</p>
+            ${A.safraTipica ? `<p class="text-sm text-slate-300 mb-2"><i class="fa-solid fa-seedling text-verde-claro mr-1.5"></i>Safra típica: <b class="text-white">${dataSem(A.safraTipica[0])} a ${dataSem(A.safraTipica[1])}</b></p>` : ''}
+            ${A.emSafra && A.proj.length ? `
+            <p class="text-xs text-slate-400 mb-2">${A.sazonal ? 'Em safra. ' : ''}A partir de ${R$(A.p0)} (${dataCurta(A.ult.d)}), repetindo o comportamento de ${A.usados.join(', ')} nas mesmas semanas.</p>
             <table class="w-full text-[15px]">
                 <tr><th></th><th class="text-right text-xs text-slate-400 font-semibold pb-1">Previsto</th><th class="text-right text-xs text-slate-400 font-semibold pb-1 pl-2">Faixa</th></tr>
-                ${linhaProj('Em 4 semanas', p4)}${linhaProj('Em 8 semanas', p8)}${linhaProj('Em 12 semanas', p12)}
+                ${hs.map(h => linhaProj(`Em ${h} semana${h > 1 ? 's' : ''}`, A.proj.find(p => p.h === h))).join('')}
             </table>
-            <p class="text-[11px] text-slate-500 mt-2">Estimativa estatística a partir dos anos anteriores. Não considera clima, safra ou mercado deste ano; use como referência, não como garantia.</p>`
-            : `<p class="text-sm text-slate-400">Histórico insuficiente para prever: são necessários pelo menos 2 anos anteriores com cotação nas mesmas semanas${A.anos.length < 2 ? ` (esta praça tem dados desde ${A.anos[A.anos.length - 1] || A.atual})` : ''}.</p>`}
+            ${A.fimSafra ? `<p class="text-sm text-slate-300 mt-2"><i class="fa-solid fa-flag-checkered text-ouro mr-1.5"></i>Fim de safra provável: <b class="text-white">semana de ${dataSem(A.fimSafra)}</b> (nos anos anteriores a cotação parava por aí).</p>` : ''}`
+            : A.emSafra ? `<p class="text-sm text-slate-400">${A.fimSafra ? `Fim de safra: nos anos anteriores a cotação parava por volta da semana de ${dataSem(A.fimSafra)}, então não há base para prever além disso.` : `Histórico insuficiente para prever: são necessários pelo menos 2 anos anteriores com cotação nas mesmas semanas${A.anos.length < 2 ? ` (esta praça tem dados desde ${A.anos[A.anos.length - 1] || A.atual})` : ''}.`}</p>`
+            : `<p class="text-sm text-slate-300"><i class="fa-solid fa-moon text-slate-400 mr-1.5"></i>Fora de safra (última cotação em ${dataBR(A.ult.d)}).</p>
+               ${A.proxima ? `<p class="text-sm text-slate-300 mt-2">Nos anos anteriores (${A.usados.join(', ')}), a cotação recomeçou por volta da <b class="text-white">semana de ${dataSem(A.proxima.w)}</b>, com preço inicial em torno de <b class="text-white">${R$(A.proxima.v)}</b> <span class="text-slate-500">(${preco(A.proxima.lo)}–${preco(A.proxima.hi)})</span>.</p>`
+                 : '<p class="text-sm text-slate-400 mt-2">Sem anos anteriores suficientes para estimar o início da próxima safra.</p>'}`}
+            <p class="text-[11px] text-slate-500 mt-2">Estimativa a partir dos anos anteriores, só com sequências de ${SEQ_MIN}+ cotações seguidas. Não considera clima ou mercado deste ano; use como referência, não como garantia.</p>
         </div>
 
         <div class="${box} overflow-x-auto">
