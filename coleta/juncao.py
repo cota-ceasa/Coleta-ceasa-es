@@ -96,6 +96,19 @@ def detectar(conn, aplicar=True):
             if RAZAO_MIN <= razao <= RAZAO_MAX:
                 cands.append((abs(math.log(razao)), (ini_b - fim_a).days, (d2, e2), razao))
         if not cands:
+            if not aplicar:   # simulação: mostra o candidato mais próximo que não passou nas regras
+                quase = []
+                for (c2, p2, d2, e2), pb in series.items():
+                    if c2 != ceasa or p2 != prod or (d2, e2) == (det, emb) or len(pb) < MIN_NOVA:
+                        continue
+                    gap = (pb[0][0] - fim_a).days
+                    if -30 <= gap <= 365:
+                        r = statistics.median(v for _, v in pb[:10]) / ref_a
+                        nova = "nova" if pb[0][0] > pa[0][0] else "já existia"
+                        quase.append((abs(gap), f"«{d2}» [{e2}] começou {gap:+d} d, preço x{r:.2f}, {nova}, un {emb_info(e2)[0]}"))
+                if quase:
+                    print(f"[quase] {ceasa} {prod} «{det}» [{emb}] parou {fim_a:%d/%m/%Y} ({len(pa)} cot.): "
+                          + "; ".join(q for _, q in sorted(quase)[:3]))
             continue
         cands.sort()
         if len(cands) > 1 and cands[1][0] - cands[0][0] < 0.05:
