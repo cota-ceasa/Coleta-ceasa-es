@@ -120,7 +120,8 @@
     <!-- Conteúdo Principal -->
     <main class="flex-1 w-full px-4 py-4">
         <section id="vista-lista" class="space-y-4">
-        <div class="flex flex-col items-stretch gap-3">
+        <!-- Filtros e busca: ficam presos logo abaixo do cabeçalho ao rolar a lista -->
+        <div id="barra-filtros" class="flex flex-col items-stretch gap-3 sticky z-20 bg-mata-950 -mx-4 px-4 -mt-4 pt-4 pb-3 shadow-[0_8px_8px_-8px_rgba(0,0,0,.35)]" style="top: var(--topo, 72px)">
             <!-- Grupo de produtos e localidade: lado a lado, mesmo estilo -->
             <div id="filtros-lista" class="grid grid-cols-2 gap-3 transition-opacity">
                 <div class="relative">
@@ -199,6 +200,11 @@
     <script src="util.js"></script>
     <script src="grafico.js"></script>
     <script src="auth.js"></script>
+    <script>
+        // altura do cabeçalho -> posição dos filtros fixos
+        const ajustarTopo = () => document.documentElement.style.setProperty('--topo', document.querySelector('header').offsetHeight + 'px');
+        ajustarTopo(); addEventListener('resize', ajustarTopo);
+    </script>
     <script src="anual.js"></script>
     <script src="app.js"></script>
     <script>
