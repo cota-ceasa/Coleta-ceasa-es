@@ -9,7 +9,7 @@ const ANUAL = {
     ANOS: 6,          // atual + 5 anteriores
     HORIZ: 12,        // semanas de previsão
     // escala do verde (ano atual, linha mais grossa) ao amarelo (ano mais antigo, mais fina)
-    DE: [21, 160, 61], ATE: [242, 214, 0],
+    DE_HSL: [138, 77, 36], ATE_HSL: [52, 90, 51],   // #15A03D (verde) -> #F2D411 (amarelo do app)
     ocultos: new Set(),
 };
 
@@ -67,9 +67,11 @@ function calcularAnual(it, mid) {
     return { sem, anos, atual, w0, p0, ult, proj, usados: [...usados].sort((a, b) => b - a), resumo };
 }
 
+// transição pelo matiz (HSL): verde -> verde-limão -> amarelo, sem passar pelo oliva apagado
 function corAno(k) {
     const t = Math.min(1, k / (ANUAL.ANOS - 1));
-    return '#' + ANUAL.DE.map((c, i) => Math.round(c + (ANUAL.ATE[i] - c) * t).toString(16).padStart(2, '0')).join('');
+    const [h1, s1, l1] = ANUAL.DE_HSL, [h2, s2, l2] = ANUAL.ATE_HSL;
+    return `hsl(${(h1 + (h2 - h1) * t).toFixed(0)} ${(s1 + (s2 - s1) * t).toFixed(0)}% ${(l1 + (l2 - l1) * t).toFixed(0)}%)`;
 }
 function opAno(k) { return Math.max(0.3, 1 - 0.1 * k); }            // atual 100%, depois 90%, 80%...
 function espAno(k) { return Math.max(1.2, 3.6 - 0.5 * k); }         // atual mais grossa, as outras afinando
