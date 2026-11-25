@@ -9,7 +9,8 @@ const ANUAL = {
     ANOS: 6,          // atual + 5 anteriores
     HORIZ: 12,        // semanas de previsão
     // escala do verde (ano atual, linha mais grossa) ao amarelo (ano mais antigo, mais fina)
-    DE_HSL: [138, 77, 36], ATE_HSL: [60, 97, 59],   // #15A03D (verde) -> #FCFC30 (amarelo-neon)
+    // escala do ano atual ao mais antigo: azul -> verde -> amarelo marca-texto (#FCFC30)
+    ESCALA_HSL: [[212, 90, 56], [138, 77, 40], [60, 97, 59]],
     ocultos: new Set(),
 };
 
@@ -133,9 +134,10 @@ function calcularAnual(it, mid) {
 // k = 0 (ano atual) ... n-1 (ano mais antigo mostrado); a escala usa os anos que existem de fato
 const posAno = (k) => ANUAL.n > 1 ? Math.min(1, k / (ANUAL.n - 1)) : 0;
 function corAno(k) {
-    const t = posAno(k);
-    const [h1, s1, l1] = ANUAL.DE_HSL, [h2, s2, l2] = ANUAL.ATE_HSL;
-    return `hsl(${(h1 + (h2 - h1) * t).toFixed(0)} ${(s1 + (s2 - s1) * t).toFixed(0)}% ${(l1 + (l2 - l1) * t).toFixed(0)}%)`;
+    const e = ANUAL.ESCALA_HSL, t = posAno(k) * (e.length - 1);
+    const i = Math.min(e.length - 2, Math.floor(t)), f = t - i;   // trecho da escala e posição nele
+    const [h1, s1, l1] = e[i], [h2, s2, l2] = e[i + 1];
+    return `hsl(${(h1 + (h2 - h1) * f).toFixed(0)} ${(s1 + (s2 - s1) * f).toFixed(0)}% ${(l1 + (l2 - l1) * f).toFixed(0)}%)`;
 }
 function opAno() { return 1; }                                       // cor cheia em todos os anos
 function espAno(k) { return 3.6 - 2.6 * posAno(k); }                // atual 3,6 px ... mais antigo 1 px
