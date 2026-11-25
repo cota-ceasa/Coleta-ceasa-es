@@ -28,7 +28,7 @@ const Graf = {
         });
         // linha tracejada no preço mais recente (referência: está alto ou baixo?)
         const yu = y(vals[n0 - 1]).toFixed(1);
-        o += `<line x1="${ml}" x2="${W - mr}" y1="${yu}" y2="${yu}" stroke="#F5DD32" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.85"/>`;
+        o += `<line x1="${ml}" x2="${W - mr}" y1="${yu}" y2="${yu}" stroke="#F0F02A" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.85"/>`;
         if (n0 > 1) o += `<polyline fill="none" stroke="${cor}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" points="${linha(0, n0 - 1)}"/>`;
         o += `<circle cx="${x(n0 - 1).toFixed(1)}" cy="${y(vals[n0 - 1]).toFixed(1)}" r="4" fill="${cor}"/>` +
              `<line id="g-lin" x1="0" x2="0" y1="${mt}" y2="${H - mb}" stroke="#94a3b8" stroke-dasharray="3 3" visibility="hidden"/>` +
@@ -181,7 +181,7 @@ const Graf = {
         // meses no eixo X (e os do ano seguinte, se o eixo passar de dezembro)
         'JFMAMJJASONDJFMA'.split('').forEach((l, m) => {
             const w = (new Date(2001, m, 1) - new Date(2001, 0, 1)) / 864e5 / 7 + 2;
-            if (w <= wMax) o += `<text x="${x(w).toFixed(1)}" y="${H - 7}" font-size="11" text-anchor="middle" fill="${m > 11 ? '#F5DD32' : '#94a3b8'}">${l}</text>`;
+            if (w <= wMax) o += `<text x="${x(w).toFixed(1)}" y="${H - 7}" font-size="11" text-anchor="middle" fill="${m > 11 ? '#F0F02A' : '#94a3b8'}">${l}</text>`;
         });
         if (wMax > 51) o += `<line x1="${x(51.5).toFixed(1)}" x2="${x(51.5).toFixed(1)}" y1="${mt}" y2="${H - mb}" stroke="#94a3b8" stroke-opacity="0.5" stroke-dasharray="2 3"/>`;
         // faixa e linha da previsão (só o trecho dentro do ano)

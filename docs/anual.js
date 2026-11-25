@@ -112,18 +112,21 @@ function calcularAnual(it, mid) {
         const v = sem[a].filter(x => x != null);
         return { a, md: v.reduce((x, y) => x + y, 0) / v.length, mn: Math.min(...v), mx: Math.max(...v), nesta: valorSemana(sem, a, wHoje), parcial: a === atual };
     });
+    ANUAL.n = anos.length;
     return { sem, anos, atual, w0, wHoje, p0, ult, proj, emSafra, sazonal, safraTipica, fimSafra, proxima,
              usados: [...usados].sort((a, b) => b - a), resumo };
 }
 
 // transição pelo matiz (HSL): verde -> verde-limão -> amarelo, sem passar pelo oliva apagado
+// k = 0 (ano atual) ... n-1 (ano mais antigo mostrado); a escala usa os anos que existem de fato
+const posAno = (k) => ANUAL.n > 1 ? Math.min(1, k / (ANUAL.n - 1)) : 0;
 function corAno(k) {
-    const t = Math.min(1, k / (ANUAL.ANOS - 1));
+    const t = posAno(k);
     const [h1, s1, l1] = ANUAL.DE_HSL, [h2, s2, l2] = ANUAL.ATE_HSL;
     return `hsl(${(h1 + (h2 - h1) * t).toFixed(0)} ${(s1 + (s2 - s1) * t).toFixed(0)}% ${(l1 + (l2 - l1) * t).toFixed(0)}%)`;
 }
-function opAno(k) { return Math.max(0.3, 1 - 0.1 * k); }            // atual 100%, depois 90%, 80%...
-function espAno(k) { return Math.max(1.2, 3.6 - 0.5 * k); }         // atual mais grossa, as outras afinando
+function opAno() { return 1; }                                       // cor cheia em todos os anos
+function espAno(k) { return 3.6 - 2.6 * posAno(k); }                // atual 3,6 px ... mais antigo 1 px
 
 function renderAnual() {
     const y = window.scrollY;
