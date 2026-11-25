@@ -65,6 +65,37 @@ def aplicar_em(cotacoes, ceasa, mapa):
     return cotacoes
 
 
+def padronizar_legado(conn, aplicar=True):
+    """Cotações antigas (importadas antes do coletor atual, sem linhas brutas para renormalizar)
+    com nome fora do padrão: 'Tilapia' -> 'Tilápia'; 'Caqui Rama Forte T.48-56' -> 'Caqui'
+    «RAMA FORTE T 48 56». Usa o mesmo dicionário da coleta; só mexe em produto que ainda não é
+    um nome padrão, então nada que já está certo muda."""
+    from importlib import import_module
+
+    from .padronizar import APELIDOS_GERAIS, _indice, produto_detalhe
+    trocas = []
+    for ceasa, prod, det in conn.consultar("SELECT DISTINCT ceasa_id, produto, detalhe FROM cotacao"):
+        try:
+            apel = getattr(import_module(f".ceasas.{ceasa.lower()}", __package__), "APELIDOS", None)
+        except ImportError:
+            apel = None
+        padrao = {p for _n, p in _indice({**APELIDOS_GERAIS, **(apel or {})})}
+        if prod in padrao:
+            continue
+        p2, d2 = produto_detalhe(f"{prod} {det}".strip(), apel)
+        if p2 and (p2, d2) != (prod, det):
+            trocas.append((ceasa, prod, det, p2, d2))
+    for ceasa, prod, det, p2, d2 in trocas:
+        print(f"[nome] {ceasa} «{prod}» «{det}» -> «{p2}» «{d2}»")
+        if aplicar:
+            conn.executar("UPDATE cotacao SET produto = %s, detalhe = %s WHERE ceasa_id = %s AND produto = %s AND detalhe = %s",
+                          (p2, d2, ceasa, prod, det))
+    if aplicar and trocas:
+        conn.commit()
+    print(f"[nome] {len(trocas)} nome(s) antigo(s) padronizado(s){'' if aplicar else ' (simulação)'}")
+    return trocas
+
+
 def detectar(conn, aplicar=True):
     conn.executar(SQL_TABELA)
     linhas = conn.consultar("SELECT ceasa_id, data, produto, detalhe, embalagem, comum FROM cotacao "

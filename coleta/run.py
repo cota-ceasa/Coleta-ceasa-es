@@ -183,7 +183,9 @@ def main():
     for c in alvo:
         normalizar(conn, c)
     if not a.sem_exportar:   # só na nuvem, com todas as praças normalizadas
-        juncao.detectar(conn, aplicar=os.environ.get("JUNCOES", "aplicar") != "simular")
+        aplicar = os.environ.get("JUNCOES", "aplicar") != "simular"
+        juncao.padronizar_legado(conn, aplicar)   # nomes antigos fora do padrão -> padrão (une as séries)
+        juncao.detectar(conn, aplicar)            # troca de nome no boletim -> junta na série nova
         exportar(conn, a.json)
     conn.close()
     return 1 if (falhas == len(alvo) and not a.renormalizar) else 0  # erro só se todas falharem (o GitHub avisa por e-mail)
