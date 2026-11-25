@@ -149,51 +149,89 @@ const Graf = {
         el('gm-info').innerHTML = this.infoM(c.n - 1);
     },
 
-    // Anos sobrepostos (eixo X = semanas do ano, jan–dez) + previsão. A = calcularAnual(...)
+    // Anos sobrepostos (eixo X = semanas do ano) + previsão, com zoom (pinça, Ctrl+roda, botões).
     anual(A, ocultos) {
+        this.A = A; this.ocultos = ocultos;
+        const svg = this.svgA();   // calcula this.estA (escalas) antes do texto do dia
+        const zoom = !!ANUAL.zoom;
+        const bt = 'w-8 h-8 rounded-lg border border-mata-700 text-slate-200 hover:bg-mata-800 flex items-center justify-center text-sm transition-colors';
+        let o = `<div class="flex flex-wrap gap-1.5 mb-2" role="group" aria-label="Anos no gráfico">${A.anos.map((a, k) => {
+            const on = !ocultos.has(a);
+            return `<button data-act="anual-ano" data-arg="${a}" aria-pressed="${on}" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs font-bold transition-colors ${on ? 'border-mata-700 text-slate-200' : 'border-mata-800 text-slate-500 line-through'}" style="opacity:${on ? opAno(k) : 0.6}"><span class="w-3 rounded-full" style="background:${corAno(k)};height:${espAno(k)}px"></span>${a}</button>`;
+        }).join('')}</div>`;
+        o += `<div class="flex items-center justify-end gap-1 mb-2" role="group" aria-label="Zoom do gráfico">
+                <span class="text-[11px] text-slate-500 mr-auto">Zoom: pinça, Ctrl+roda ou botões</span>
+                ${zoom ? `<button onclick="Graf.zoomA('esq')" class="${bt}" aria-label="Voltar no tempo"><i class="fa-solid fa-chevron-left"></i></button>
+                <button onclick="Graf.zoomA('dir')" class="${bt}" aria-label="Avançar no tempo"><i class="fa-solid fa-chevron-right"></i></button>` : ''}
+                <button onclick="Graf.zoomA('mais')" class="${bt}" aria-label="Aproximar"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                <button onclick="Graf.zoomA('menos')" class="${bt}" aria-label="Afastar"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                ${zoom ? `<button onclick="Graf.zoomA('tudo')" class="${bt}" aria-label="Ver tudo"><i class="fa-solid fa-expand"></i></button>` : ''}
+        </div>
+        <div id="ga-info" aria-live="polite" class="min-h-[44px]">${this.infoA(this.estA.wPadrao)}</div>`;
+        o += `<div id="ga-wrap" style="touch-action:pan-y;cursor:crosshair" onpointerdown="Graf.gDown(event)" onpointermove="Graf.gMove(event)" onpointerup="Graf.gUp(event)" onpointercancel="Graf.gUp(event)" onpointerleave="Graf.gSair(event)" onwheel="Graf.gRoda(event)">${svg}</div>`;
+        return o;
+    },
+
+    svgA() {
+        const A = this.A, ocultos = this.ocultos;
         const W = 320, H = 200, ml = 42, mr = 10, mt = 8, mb = 24;
         const vis = A.anos.map((a, k) => ({ a, k })).filter(o => !ocultos.has(o.a));
         const proj = A.proj;
         // se a previsão passa de dezembro, o eixo continua pelo começo do ano seguinte
         const wMax = Math.max(51, ...proj.map(p => p.w));
         const val = (a, w) => w <= 51 ? A.sem[a][w] : ((A.sem[a + 1] || [])[w - 52] ?? null);
-        const vals = vis.flatMap(o => [...Array(wMax + 1).keys()].map(w => o.a === A.atual && w > 51 ? null : val(o.a, w)).filter(v => v != null))
-            .concat(ocultos.has(A.atual) ? [] : proj.flatMap(p => [p.lo, p.hi]))
-            .concat(A.proxima ? [A.proxima.lo, A.proxima.hi] : []);
+        const serieAno = (a) => [...Array(wMax + 1).keys()].map(w => a === A.atual && w > 51 ? null : val(a, w));
+        // eixo X só nos meses com dados (destaca a safra): da 1ª à última semana com cotação ou previsão
+        const temDado = (w) => vis.some(o => !(o.a === A.atual && w > 51) && val(o.a, w) != null) || proj.some(p => p.w === w);
+        let bIni = 0, bFim = wMax;
+        while (bIni < wMax && !temDado(bIni)) bIni++;
+        while (bFim > bIni && !temDado(bFim)) bFim--;
+        if (A.proxima) { bIni = Math.min(bIni, A.proxima.w % 52); bFim = Math.max(bFim, A.proxima.w % 52); }
+        bIni = Math.max(0, bIni - 1); bFim = Math.min(wMax, bFim + 1);
+        if (bFim - bIni < 4) { bIni = 0; bFim = wMax; }
+        // zoom: trecho escolhido dentro da vista inteira (mínimo 4 semanas)
+        let wIni = bIni, wFim = bFim;
+        if (ANUAL.zoom) {
+            const span = Math.max(4, Math.min(bFim - bIni, ANUAL.zoom.fim - ANUAL.zoom.ini));
+            wIni = Math.max(bIni, Math.min(bFim - span, ANUAL.zoom.ini));
+            wFim = wIni + span;
+            if (span >= bFim - bIni) { ANUAL.zoom = null; wIni = bIni; wFim = bFim; } else ANUAL.zoom = { ini: wIni, fim: wFim };
+        }
+        // eixo Y ajustado ao trecho visível
+        const dentro = (w) => w >= Math.floor(wIni) && w <= Math.ceil(wFim);
+        const vals = vis.flatMap(o => serieAno(o.a).filter((v, w) => v != null && dentro(w)))
+            .concat(ocultos.has(A.atual) ? [] : proj.filter(p => dentro(p.w)).flatMap(p => [p.lo, p.hi]))
+            .concat(A.proxima && dentro(A.proxima.w % 52) ? [A.proxima.lo, A.proxima.hi] : []);
         let mn = vals.length ? Math.min(...vals) : 0, mx = vals.length ? Math.max(...vals) : 1;
         const pd = (mx - mn) * 0.1 || 0.1;
         mn -= pd; mx += pd;
-        // eixo X só nos meses com dados (destaca a safra): da 1ª à última semana com cotação ou previsão
-        const temDado = (w) => vis.some(o => !(o.a === A.atual && w > 51) && val(o.a, w) != null) || proj.some(p => p.w === w);
-        let wIni = 0, wFim = wMax;
-        while (wIni < wMax && !temDado(wIni)) wIni++;
-        while (wFim > wIni && !temDado(wFim)) wFim--;
-        if (A.proxima) { wIni = Math.min(wIni, A.proxima.w % 52); wFim = Math.max(wFim, A.proxima.w % 52); }
-        wIni = Math.max(0, wIni - 1); wFim = Math.min(wMax, wFim + 1);
-        if (wFim - wIni < 4) { wIni = 0; wFim = wMax; }
         const x = (w) => ml + (w - wIni) * (W - ml - mr) / (wFim - wIni);
         const y = (v) => H - mb - (v - mn) / (mx - mn) * (H - mb - mt);
-        const wPadrao = Math.max(wIni, Math.min(wFim, A.w0));
-        this.estA = { A, vis, proj, W, ml, mr, x, y, wMax, wIni, wFim, wPadrao, val };
+        const wPadrao = Math.max(Math.ceil(wIni), Math.min(Math.floor(wFim), A.w0));
+        this.estA = { A, vis, proj, W, ml, mr, x, y, wMax, wIni, wFim, bIni, bFim, wPadrao, val };
 
-        let o = `<div class="flex flex-wrap gap-1.5 mb-2" role="group" aria-label="Anos no gráfico">${A.anos.map((a, k) => {
-            const on = !ocultos.has(a);
-            return `<button data-act="anual-ano" data-arg="${a}" aria-pressed="${on}" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs font-bold transition-colors ${on ? 'border-mata-700 text-slate-200' : 'border-mata-800 text-slate-500 line-through'}" style="opacity:${on ? opAno(k) : 0.6}"><span class="w-3 rounded-full" style="background:${corAno(k)};height:${espAno(k)}px"></span>${a}</button>`;
-        }).join('')}</div>`;
-        o += `<div id="ga-info" aria-live="polite" class="min-h-[44px]">${this.infoA(wPadrao)}</div>`;
-        o += `<svg id="ga-svg" viewBox="0 0 ${W} ${H}" width="100%" style="touch-action:pan-y;display:block;cursor:crosshair" role="img" aria-label="Preço semanal de cada ano sobreposto" onpointermove="Graf.hoverA(event)" onpointerdown="Graf.hoverA(event)" onpointerleave="if(event.pointerType==='mouse')Graf.sairA()">`;
+        let o = `<svg id="ga-svg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block" role="img" aria-label="Preço semanal de cada ano sobreposto">`;
+        o += `<defs><clipPath id="ga-clip"><rect x="${ml}" y="0" width="${W - ml - mr}" height="${H - mb + 2}"/></clipPath></defs>`;
         [0, 0.5, 1].forEach(t => {
             const v = mn + (mx - mn) * t;
             o += `<line x1="${ml}" x2="${W - mr}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="#1c4630"/>` +
                  `<text x="${ml - 5}" y="${(y(v) + 4).toFixed(1)}" font-size="11" text-anchor="end" fill="#94a3b8">${v.toFixed(2).replace('.', ',')}</text>`;
         });
-        // meses no eixo X (e os do ano seguinte, se o eixo passar de dezembro)
-        'JFMAMJJASONDJFMA'.split('').forEach((l, m) => {
-            const w = (new Date(2001, m, 1) - new Date(2001, 0, 1)) / 864e5 / 7 + 2;
-            if (w >= wIni - 1 && w <= wFim + 1) o += `<text x="${x(w).toFixed(1)}" y="${H - 7}" font-size="11" text-anchor="middle" fill="${m > 11 ? '#F0F02A' : '#94a3b8'}">${l}</text>`;
-        });
-        if (wFim > 51) o += `<line x1="${x(51.5).toFixed(1)}" x2="${x(51.5).toFixed(1)}" y1="${mt}" y2="${H - mb}" stroke="#94a3b8" stroke-opacity="0.5" stroke-dasharray="2 3"/>`;
-        // faixa e linha da previsão (só o trecho dentro do ano)
+        if (wFim - wIni > 20) {   // vista larga: iniciais dos meses (os do ano seguinte em amarelo)
+            'JFMAMJJASONDJFMA'.split('').forEach((l, m) => {
+                const w = (new Date(2001, m, 1) - new Date(2001, 0, 1)) / 864e5 / 7 + 2;
+                if (w >= wIni - 0.5 && w <= wFim + 0.5) o += `<text x="${x(w).toFixed(1)}" y="${H - 7}" font-size="11" text-anchor="middle" fill="${m > 11 ? '#F0F02A' : '#94a3b8'}">${l}</text>`;
+            });
+        } else {                  // com zoom: datas das semanas
+            const passo = Math.max(1, Math.round((wFim - wIni) / 5));
+            for (let w = Math.ceil(wIni); w <= wFim; w += passo) {
+                const d = new Date(A.atual, 0, 1 + 7 * w, 12);
+                o += `<text x="${x(w).toFixed(1)}" y="${H - 7}" font-size="10.5" text-anchor="middle" fill="${w > 51 ? '#F0F02A' : '#94a3b8'}">${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}</text>`;
+            }
+        }
+        o += '<g clip-path="url(#ga-clip)">';
+        if (wFim > 51 && wIni < 51.5) o += `<line x1="${x(51.5).toFixed(1)}" x2="${x(51.5).toFixed(1)}" y1="${mt}" y2="${H - mb}" stroke="#94a3b8" stroke-opacity="0.5" stroke-dasharray="2 3"/>`;
+        // faixa e linha da previsão
         if (proj.length && !ocultos.has(A.atual)) {
             const base = { w: A.w0, v: (A.sem[+A.ult.d.slice(0, 4)] || [])[A.w0] ?? A.p0 };
             const cima = [{ w: base.w, v: base.v }, ...proj.map(p => ({ w: p.w, v: p.hi }))];
@@ -202,7 +240,7 @@ const Graf = {
             o += `<polyline fill="none" stroke="${corAno(0)}" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="0.1 4.5" points="${[base, ...proj].map(p => `${x(p.w).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')}"/>`;
         }
         // fora de safra: onde e com que preço a próxima safra costuma começar
-        if (A.proxima) {   // na semana do calendário em que a safra costuma recomeçar
+        if (A.proxima) {
             const X = x(A.proxima.w % 52).toFixed(1);
             o += `<line x1="${X}" x2="${X}" y1="${y(A.proxima.hi).toFixed(1)}" y2="${y(A.proxima.lo).toFixed(1)}" stroke="${corAno(0)}" stroke-width="3" stroke-linecap="round" stroke-opacity="0.5"/>` +
                  `<circle cx="${X}" cy="${y(A.proxima.v).toFixed(1)}" r="4.5" fill="none" stroke="${corAno(0)}" stroke-width="2.5" stroke-dasharray="3 2"/>` +
@@ -210,9 +248,8 @@ const Graf = {
         }
         // anos: do mais antigo para o atual (o atual fica por cima)
         [...vis].reverse().forEach(({ a, k }) => {
-            const s = [...Array(wMax + 1).keys()].map(w => a === A.atual && w > 51 ? null : val(a, w));
             let seg = [], segs = [];
-            s.forEach((v, w) => { if (v != null) seg.push(`${x(w).toFixed(1)},${y(v).toFixed(1)}`); else if (seg.length) { segs.push(seg); seg = []; } });
+            serieAno(a).forEach((v, w) => { if (v != null) seg.push(`${x(w).toFixed(1)},${y(v).toFixed(1)}`); else if (seg.length) { segs.push(seg); seg = []; } });
             if (seg.length) segs.push(seg);
             segs.forEach(sg => {
                 o += sg.length > 1
@@ -220,6 +257,7 @@ const Graf = {
                     : `<circle cx="${sg[0].split(',')[0]}" cy="${sg[0].split(',')[1]}" r="2" fill="${corAno(k)}" fill-opacity="${opAno(k)}"/>`;
             });
         });
+        o += '</g>';
         o += `<line id="ga-lin" x1="0" x2="0" y1="${mt}" y2="${H - mb}" stroke="#94a3b8" stroke-dasharray="3 3" visibility="hidden"/>`;
         return o + '</svg>';
     },
@@ -232,18 +270,21 @@ const Graf = {
             const v = a === A.atual && w > 51 ? null : c.val(a, w);
             return `<span class="inline-flex items-center gap-1 text-sm" style="opacity:${opAno(k)}"><span class="w-2 h-2 rounded-full" style="background:${corAno(k)}"></span><span class="text-slate-400 text-xs font-semibold">${a}</span><b class="text-white">${v != null ? preco(v) : '–'}</b></span>`;
         });
-        if (p && !ocultosAtual()) itens.push(`<span class="inline-flex items-center gap-1 text-sm"><span class="text-ouro text-xs font-bold">previsão</span><b class="text-white">${preco(p.v)}</b><span class="text-[11px] text-slate-500">(${preco(p.lo)}–${preco(p.hi)})</span></span>`);
+        if (p && !ANUAL.ocultos.has(A.atual)) itens.push(`<span class="inline-flex items-center gap-1 text-sm"><span class="text-ouro text-xs font-bold">previsão</span><b class="text-white">${preco(p.v)}</b><span class="text-[11px] text-slate-500">(${preco(p.lo)}–${preco(p.hi)})</span></span>`);
         return `<div class="text-xs text-slate-400 mb-1">Semana de ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} · R$</div><div class="flex flex-wrap gap-x-3 gap-y-1">${itens.join('')}</div>`;
+    },
 
-        function ocultosAtual() { return ANUAL.ocultos.has(A.atual); }
+    // semana sob a posição X da tela
+    semanaEm(clientX) {
+        const c = this.estA, r = el('ga-svg').getBoundingClientRect();
+        const px = (clientX - r.left) / r.width * c.W;
+        return c.wIni + (px - c.ml) / (c.W - c.ml - c.mr) * (c.wFim - c.wIni);
     },
 
     hoverA(e) {
         const c = this.estA;
         if (!c) return;
-        const r = el('ga-svg').getBoundingClientRect();
-        const px = (e.clientX - r.left) / r.width * c.W;
-        const w = Math.max(c.wIni, Math.min(c.wFim, c.wIni + Math.round((px - c.ml) / ((c.W - c.ml - c.mr) / (c.wFim - c.wIni)))));
+        const w = Math.max(Math.ceil(c.wIni), Math.min(Math.floor(c.wFim), Math.round(this.semanaEm(e.clientX))));
         const l = el('ga-lin');
         l.setAttribute('x1', c.x(w)); l.setAttribute('x2', c.x(w)); l.setAttribute('visibility', 'visible');
         el('ga-info').innerHTML = this.infoA(w);
@@ -254,6 +295,73 @@ const Graf = {
         if (!c) return;
         el('ga-lin').setAttribute('visibility', 'hidden');
         el('ga-info').innerHTML = this.infoA(c.wPadrao);
+    },
+
+    // ---- zoom ----
+    redesenharA() {
+        if (this._raf) return;
+        this._raf = requestAnimationFrame(() => {
+            this._raf = null;
+            if (this._pinca) {        // durante a pinça: só o gráfico (o quadro que recebe os dedos fica)
+                el('ga-wrap').innerHTML = this.svgA();
+                el('ga-info').innerHTML = this.infoA(this.estA.wPadrao);
+            } else renderAnual();     // botões (setas, ver tudo) dependem do zoom
+        });
+    },
+    aplicarZoomA(ini, fim) {
+        const c = this.estA;
+        const span = Math.max(4, fim - ini);
+        if (span >= c.bFim - c.bIni) ANUAL.zoom = null;
+        else {
+            ini = Math.max(c.bIni, Math.min(c.bFim - span, ini));
+            ANUAL.zoom = { ini, fim: ini + span };
+        }
+        this.redesenharA();
+    },
+    zoomA(acao) {
+        const c = this.estA;
+        const ini = c.wIni, fim = c.wFim, span = fim - ini, meio = (ini + fim) / 2;
+        if (acao === 'tudo') { ANUAL.zoom = null; return this.redesenharA(); }
+        if (acao === 'mais') return this.aplicarZoomA(meio - span * 0.3, meio + span * 0.3);
+        if (acao === 'menos') return this.aplicarZoomA(meio - span * 0.85, meio + span * 0.85);
+        const d = span * 0.35 * (acao === 'esq' ? -1 : 1);
+        this.aplicarZoomA(ini + d, fim + d);
+    },
+    _ptr: new Map(),
+    gDown(e) {
+        this._ptr.set(e.pointerId, e.clientX);
+        if (this._ptr.size === 2) {   // começou a pinça
+            const [a, b] = [...this._ptr.values()];
+            this._pinca = { dist: Math.abs(a - b) || 1, ini: this.estA.wIni, fim: this.estA.wFim, meio: this.semanaEm((a + b) / 2) };
+            try { el('ga-wrap').setPointerCapture(e.pointerId); } catch (_) { /* ponteiro já solto */ }
+        } else this.hoverA(e);
+    },
+    gMove(e) {
+        if (!this._ptr.has(e.pointerId)) { if (e.pointerType === 'mouse') this.hoverA(e); return; }
+        this._ptr.set(e.pointerId, e.clientX);
+        if (this._ptr.size >= 2 && this._pinca) {
+            e.preventDefault();
+            const [a, b] = [...this._ptr.values()];
+            const p = this._pinca, f = p.dist / (Math.abs(a - b) || 1);
+            const span = (p.fim - p.ini) * f;
+            // o ponto entre os dedos fica sob os dedos (arrastar com dois dedos desloca)
+            const r = el('ga-svg').getBoundingClientRect(), c = this.estA;
+            const frac = (((a + b) / 2 - r.left) / r.width * c.W - c.ml) / (c.W - c.ml - c.mr);
+            this.aplicarZoomA(p.meio - frac * span, p.meio - frac * span + span);
+        } else this.hoverA(e);
+    },
+    gUp(e) {
+        this._ptr.delete(e.pointerId);
+        if (this._ptr.size < 2 && this._pinca) { this._pinca = null; this.redesenharA(); }
+    },
+    gSair(e) {
+        if (e.pointerType === 'mouse') { this._ptr.delete(e.pointerId); this.sairA(); }
+    },
+    gRoda(e) {   // Ctrl + roda do mouse, ou pinça do touchpad
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+        const c = this.estA, w = this.semanaEm(e.clientX), f = Math.exp(e.deltaY * 0.01);
+        this.aplicarZoomA(w - (w - c.wIni) * f, w + (c.wFim - w) * f);
     },
 
     // Mini-gráfico para os cards

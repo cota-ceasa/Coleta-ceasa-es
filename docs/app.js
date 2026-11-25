@@ -413,7 +413,7 @@ function renderDetalhe() {
                 <tr class="border-t border-mata-800"><td class="py-2.5 text-slate-300">Mín. – Máx. do dia</td><td class="text-right font-bold text-white">${preco(m.min)} – ${preco(m.max)}</td></tr>
             </table>
         </div>
-        <button data-act="anual" class="w-full bg-mata-900 border border-ouro/60 hover:bg-ouro/10 text-ouro font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 transition-colors"><i class="fa-solid fa-chart-line"></i>Análise anualizada e previsão de preços</button>`;
+        <button data-act="anual" class="w-full bg-ouro hover:brightness-95 text-black font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 shadow-sm transition"><i class="fa-solid fa-chart-line"></i>Análise anualizada e previsão de preços</button>`;
     window.scrollTo(0, y);
 }
 
@@ -483,7 +483,7 @@ function renderDetalheMulti() {
                 ${linha('Mín. – Máx. do dia', id => `${preco(it.m[id].min)}–${preco(it.m[id].max)}`)}
             </table>
         </div>
-        <button data-act="anual" class="w-full bg-mata-900 border border-ouro/60 hover:bg-ouro/10 text-ouro font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 transition-colors"><i class="fa-solid fa-chart-line"></i>Análise anualizada e previsão de preços</button>`;
+        <button data-act="anual" class="w-full bg-ouro hover:brightness-95 text-black font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 shadow-sm transition"><i class="fa-solid fa-chart-line"></i>Análise anualizada e previsão de preços</button>`;
     window.scrollTo(0, y);
 }
 
@@ -558,7 +558,7 @@ document.addEventListener('click', (e) => {
         case 'voltar': voltar(); break;
         case 'merc': alternarPracaDetalhe(arg); break;
         case 'anual': abrirAnual(); break;
-        case 'anual-merc': det.anual.mid = arg; renderAnual(); break;
+        case 'anual-merc': det.anual.mid = arg; ANUAL.zoom = null; renderAnual(); break;
         case 'anual-ano': alternarAnoAnual(arg); break;
         case 'mais': abrirFolha(`
             <div class="p-6 pt-16 text-center">

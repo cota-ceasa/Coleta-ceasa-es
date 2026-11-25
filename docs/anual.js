@@ -216,6 +216,7 @@ function renderAnual() {
 }
 
 function abrirAnual() {
+    ANUAL.zoom = null;
     det.anual = { mid: det.mercs[0] };
     history.pushState({ det: det.key, anual: true }, '');
     renderAnual();
