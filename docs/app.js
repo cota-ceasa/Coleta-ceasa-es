@@ -340,6 +340,8 @@ window.addEventListener('popstate', () => {
 
 // Botões de praça do detalhe: marcar/desmarcar para incluir no gráfico de comparação
 function botoesPracas(it) {
+    // produto de uma praça só: o cabeçalho já diz qual é, o botão sobraria
+    if (dados.mercados.filter(x => it.m[x.id]).length < 2) return '';
     return `<div class="flex flex-wrap gap-1.5 bg-mata-900 border border-mata-800 rounded-2xl p-1.5" role="group" aria-label="Praças no gráfico">
         ${dados.mercados.filter(x => it.m[x.id]).map(x => {
             const on = det.mercs.includes(x.id);
