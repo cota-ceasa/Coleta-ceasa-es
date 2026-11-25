@@ -219,14 +219,16 @@ function renderizarGrid() {
     el('estado-vazio').classList.add('hidden');
 
     const frag = document.createDocumentFragment();
-    filtrados.forEach(i => frag.appendChild(criarCard(i, ms.filter(id => i.m[id]))));
+    // várias praças (marcadas ou nos favoritos): cada pastilha de preço diz a cidade
+    const comLocal = apenasFavoritos || ms.length > 1;
+    filtrados.forEach(i => frag.appendChild(criarCard(i, ms.filter(id => i.m[id]), comLocal)));
     grid.appendChild(frag);
 }
 
 const ESTRELA = (cheia, tam = 'w-6 h-6') => `<svg viewBox="0 0 24 24" class="${tam}" fill="${cheia ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 2.5l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 17.5l-5.9 3.2 1.2-6.6L2.5 9.5l6.6-.9z"/></svg>`;
 
 // Mais de uma praça: um bloco de preço por praça, para comparar
-function criarCardMulti(item, ids) {
+function criarCardMulti(item, ids, comLocal) {
     const isFav = favoritos.includes(item.k);
     const detalhe = item.d.replace(/\bLonga Vida\b/g, 'LV');
     const apoio = [UNIDADE[item.u], item.e !== 'kg' ? esc(item.e) : ''].filter(Boolean).join(' · ');
@@ -234,7 +236,7 @@ function criarCardMulti(item, ids) {
         const c = item.m[id], m = mercadoPor(id), fr = frescor(item, id), { c: vp } = variacao(item, id);
         const data = c.dt && c.dt !== m.data ? `<span class="text-ouro text-[10px] font-bold ml-1"><i class="fa-regular fa-clock"></i> ${dataCurta(c.dt)}</span>` : '';
         return `<div class="bg-mata-950 border border-mata-800 rounded-lg px-2 py-1.5 min-w-0 ${fr.velho ? 'opacity-60' : ''}">
-            ${apenasFavoritos
+            ${comLocal
                 ? etiquetaCidade(id) + (data ? `<span class="block -ml-1 leading-tight">${data}</span>` : '')
                 : `<span class="text-[11px] font-bold text-slate-300 flex items-center gap-1 whitespace-nowrap"><span class="w-2 h-2 rounded-full shrink-0" style="background:${corMercado(id)}"></span>${esc(id)}${data}</span>`}
             <span class="block text-[15px] font-bold whitespace-nowrap leading-tight mt-0.5 ${fr.velho ? 'text-slate-500' : 'text-verde-claro'}">R$ ${preco(c.com)}</span>${varMini(vp)}
@@ -264,8 +266,8 @@ function varMini(c) {
     return `<span class="block text-[10px] font-bold leading-tight ${cls}">${k === 'up' ? '▲ +' : k === 'dn' ? '▼ −' : '■ '}${Math.abs(c).toFixed(1).replace('.', ',')}%</span>`;
 }
 
-function criarCard(item, ids) {
-    if (ids.length > 1) return criarCardMulti(item, ids);
+function criarCard(item, ids, comLocal) {
+    if (ids.length > 1) return criarCardMulti(item, ids, comLocal);
     const mid = ids[0], mercado = mercadoPor(mid);
     const c = item.m[mid];
     const { c: varPct, pts } = variacao(item, mid);
@@ -298,7 +300,7 @@ function criarCard(item, ids) {
         </div>
         ${Graf.mini(pts.slice(-22).map(p => p.v), velho)}
         <div class="text-right shrink-0 min-w-[78px]">
-            ${apenasFavoritos ? etiquetaCidade(mid, 'justify-end mb-1') : ''}
+            ${comLocal ? etiquetaCidade(mid, 'justify-end mb-1') : ''}
             <div class="text-lg font-bold ${velho ? 'text-slate-500' : 'text-verde-claro'} leading-none">R$ ${preco(c.com)}</div>
             <div class="mt-1 ${velho ? 'opacity-50' : ''}">${chipVar(varPct)}</div>
         </div>`;
