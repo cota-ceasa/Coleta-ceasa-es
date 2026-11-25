@@ -39,14 +39,14 @@ GRUPOS = {
                "Cenoura", "Gengibre", "Inhame"],
     "temperos": ["Alecrim", "Alho-poró", "Cheiro Verde", "Colorau", "Louro", "Nirá", "Cebolinha", "Coentro", "Erva Doce", "Hortelã", "Manjericão", "Pimenta", "Salsa",
                  "Sálvia", "Tomilho"],
-    "frutas": ["Abacate", "Abacaxi", "Acerola", "Amora", "Banana Pacovan", "Cajá", "Cereja", "Figo", "Laranja Kinkan", "Laranja Natal", "Laranja Seleta", "Laranja Valência", "Lichia", "Pitaya", "Sapoti", "Seriguela", "Tamarindo", "Atemoia", "Carambola", "Jabuticaba", "Limão Galego", "Maracujá Doce", "Romã", "Caqui", "Fruta-pão", "Jaca", "Jenipapo", "Ameixa", "Cacau", "Caju", "Cajamanga", "Graviola", "Nectarina", "Physalis", "Pinha", "Banana Figo", "Banana Maçã", "Banana Nanica", "Banana Ouro",
+    "frutas": ["Abacate", "Abacaxi", "Acerola", "Manguita", "Amora", "Banana Pacovan", "Cajá", "Cereja", "Figo", "Laranja Kinkan", "Laranja Natal", "Laranja Seleta", "Laranja Valência", "Lichia", "Pitaya", "Sapoti", "Seriguela", "Tamarindo", "Atemoia", "Carambola", "Jabuticaba", "Limão Galego", "Maracujá Doce", "Romã", "Caqui", "Fruta-pão", "Jaca", "Jenipapo", "Ameixa", "Cacau", "Caju", "Cajamanga", "Graviola", "Nectarina", "Physalis", "Pinha", "Banana Figo", "Banana Maçã", "Banana Nanica", "Banana Ouro",
                "Banana Prata", "Banana Terra", "Coco Seco", "Coco Verde", "Goiaba", "Kiwi", "Laranja Baía",
                "Laranja Lima", "Laranja Pera", "Lima da Pérsia", "Limão Siciliano", "Limão Tahiti",
                "Mamão Formosa", "Mamão Havaí", "Manga", "Maracujá Azedo", "Maçã", "Melancia", "Melão",
                "Morango", "Pêra", "Pêssego", "Tangerina", "Uva (outras)", "Uva Itália", "Uva Niágara", "Uva Passa"],
     "ovos_graos": ["Açúcar", "Amendoim", "Arroz", "Azeite de Dendê", "Castanha de Caju", "Farelo de Trigo", "Feijão Fradinho", "Leite de Coco", "Pinhão", "Sal", "Trigo", "Farinha de Mandioca", "Feijão Carioca", "Feijão Manteiga", "Feijão Preto",
                    "Feijão Vermelho", "Fubá", "Milho Seco", "Ovos", "Ovos de Codorna"],
-    "pescados": ["Atum", "Badejo", "Bagre", "Bonito", "Cavala", "Cavalinha", "Cioba", "Corvina Congelada", "Dentão", "Dourado", "Garoupa", "Lula", "Namorado", "Olho de Boi", "Palombeta", "Papa-terra", "Parati", "Pé de Banco", "Peroá", "Pescada", "Piraúna", "Polvo", "Sarda", "Sardinha Congelada", "Tambacu", "Tilápia", "Traíra", "Trilha", "Xaréu", "Xixarro", "Bacalhau", "Camarão", "Corvina", "Manjuba", "Mistura de Peixes", "Panga", "Pargo", "Pescadinha",
+    "pescados": ["Anchova", "Atum", "Cação", "Catuá", "Espada", "Marlin", "Merluza", "Robalo", "Badejo", "Bagre", "Bonito", "Cavala", "Cavalinha", "Cioba", "Corvina Congelada", "Dentão", "Dourado", "Garoupa", "Lula", "Namorado", "Olho de Boi", "Palombeta", "Papa-terra", "Parati", "Pé de Banco", "Peroá", "Pescada", "Piraúna", "Polvo", "Sarda", "Sardinha Congelada", "Tambacu", "Tilápia", "Traíra", "Trilha", "Xaréu", "Xixarro", "Bacalhau", "Camarão", "Corvina", "Manjuba", "Mistura de Peixes", "Panga", "Pargo", "Pescadinha",
                  "Raia", "Sardinha", "Tainha"],
 }
 GRUPO_DE = {p: g for g, ps in GRUPOS.items() for p in ps}
