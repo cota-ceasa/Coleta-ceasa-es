@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cotacao-campo-v32';
+const CACHE_NAME = 'cotacao-campo-v33';
 
 // Arquivos do próprio app (mesma origem): falha em qualquer um cancela a instalação
 const LOCAL = [
@@ -46,22 +46,27 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  // Cotações: rede primeiro (sempre o dado mais novo); offline usa o último salvo
-  if (url.origin === self.location.origin && url.pathname.endsWith('/dados.json')) {
+  // Arquivos do próprio app (página, código e cotações): rede primeiro, para cada atualização
+  // aparecer já na primeira abertura; sem internet (ou rede lenta, > 5 s) usa o último salvo
+  if (url.origin === self.location.origin) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
       try {
-        const resp = await fetch(req, { cache: 'no-cache' });
+        const resp = await Promise.race([
+          fetch(req, { cache: 'no-cache' }),
+          new Promise((_, falha) => setTimeout(() => falha(new Error('lento')), 5000))
+        ]);
         if (resp.ok) cache.put(req, resp.clone());
         return resp;
       } catch {
-        return (await cache.match(req)) || Response.error();
+        return (await cache.match(req, { ignoreSearch: true }))
+          || (req.mode === 'navigate' ? cache.match('./index.html') : Response.error());
       }
     })());
     return;
   }
 
-  // Demais arquivos: cache primeiro e atualização em segundo plano
+  // CDNs (estilo e ícones): cache primeiro e atualização em segundo plano
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
     const guardado = await cache.match(req, { ignoreSearch: true });
