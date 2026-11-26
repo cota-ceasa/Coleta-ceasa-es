@@ -321,6 +321,7 @@ function abrirDetalhe(key) {
     let mercs = apenasFavoritos ? todas : mercadosSel.filter(id => it.m[id]);
     if (!mercs.length) mercs = todas.slice(0, 1);
     scrollLista = window.scrollY;
+    Graf.zoomH = null;
     det = { key, mercs };
     history.pushState({ det: key }, '');
     mostrarVista('detalhe');
@@ -401,7 +402,7 @@ function renderDetalhe() {
         ${botoesPeriodo(pers, per)}
 
         <div class="${box}">
-            ${Graf.desenhar(w)}
+            ${Graf.historico('um', w)}
             <p class="text-xs text-slate-500 mt-1">Passe o cursor ou deslize o dedo no gráfico para ver cada dia. Linha amarela tracejada: preço mais recente.</p>
         </div>
 
@@ -470,7 +471,7 @@ function renderDetalheMulti() {
         ${botoesPeriodo(pers, per)}
 
         <div class="${box}">
-            ${Graf.multi(series)}
+            ${Graf.historico('multi', series)}
             <p class="text-xs text-slate-500 mt-1">Passe o cursor ou deslize o dedo no gráfico para ver o preço de cada praça no dia.</p>
         </div>
 
@@ -556,7 +557,7 @@ document.addEventListener('click', (e) => {
         case 'fav': toggleFavorito(arg); break;
         case 'abrir': abrirDetalhe(arg); break;
         case 'voltar': voltar(); break;
-        case 'merc': alternarPracaDetalhe(arg); break;
+        case 'merc': Graf.zoomH = null; alternarPracaDetalhe(arg); break;
         case 'anual': abrirAnual(); break;
         case 'anual-merc': det.anual.mid = arg; ANUAL.zoom = null; renderAnual(); break;
         case 'anual-ano': alternarAnoAnual(arg); break;
@@ -569,7 +570,7 @@ document.addEventListener('click', (e) => {
                     <button onclick="fecharFolha()" class="mt-5 w-full bg-ouro text-mata-950 font-bold py-3 rounded-xl">Fechar</button>
                 </div>
             </div>`); break;
-        case 'per': periodoDias = +arg; renderDetalhe(); break;
+        case 'per': periodoDias = +arg; Graf.zoomH = null; renderDetalhe(); break;
     }
 });
 document.addEventListener('keydown', (e) => {

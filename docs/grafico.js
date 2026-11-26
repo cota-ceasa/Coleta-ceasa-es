@@ -70,6 +70,86 @@ const Graf = {
         el('g-info').innerHTML = this.info(c.n0 - 1);
     },
 
+    // ---------- Histórico com zoom (envolve desenhar() e multi()) ----------
+    // tipo 'um': dados = [{d, v}];  tipo 'multi': dados = [{id, cor, pts}]
+    zoomH: null,                       // {i0, i1} em posições da lista de datas, ou null
+    historico(tipo, dados) {
+        const D = tipo === 'um' ? dados.map(p => p.d) : [...new Set(dados.flatMap(s => s.pts.map(p => p.d)))].sort();
+        this.hist = { tipo, dados, D };
+        const z = this.zoomH, bt = 'w-8 h-8 rounded-lg border border-mata-700 text-slate-200 hover:bg-mata-800 flex items-center justify-center text-sm transition-colors';
+        const ctrl = D.length < 10 ? '' : `<div class="flex items-center justify-end gap-1 mb-2" role="group" aria-label="Zoom do gráfico">
+            <span class="text-[11px] text-slate-500 mr-auto">Zoom: pinça, Ctrl+roda ou botões</span>
+            ${z ? `<button onclick="Graf.zoomHist('esq')" class="${bt}" aria-label="Voltar no tempo"><i class="fa-solid fa-chevron-left"></i></button>
+            <button onclick="Graf.zoomHist('dir')" class="${bt}" aria-label="Avançar no tempo"><i class="fa-solid fa-chevron-right"></i></button>` : ''}
+            <button onclick="Graf.zoomHist('mais')" class="${bt}" aria-label="Aproximar"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+            <button onclick="Graf.zoomHist('menos')" class="${bt}" aria-label="Afastar"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+            ${z ? `<button onclick="Graf.zoomHist('tudo')" class="${bt}" aria-label="Ver tudo"><i class="fa-solid fa-expand"></i></button>` : ''}
+        </div>`;
+        return ctrl + `<div id="gh-box" style="touch-action:pan-y" onpointerdown="Graf.hDown(event)" onpointermove="Graf.hMove(event)" onpointerup="Graf.hUp(event)" onpointercancel="Graf.hUp(event)" onwheel="Graf.hRoda(event)">${this.histInner()}</div>`;
+    },
+    histInner() {
+        const { tipo, dados, D } = this.hist, z = this.zoomH;
+        if (!z) return tipo === 'um' ? this.desenhar(dados) : this.multi(dados);
+        const a = D[Math.ceil(z.i0)], b = D[Math.floor(z.i1)], dentro = p => p.d >= a && p.d <= b;
+        return tipo === 'um' ? this.desenhar(dados.filter(dentro))
+            : this.multi(dados.map(s => ({ ...s, pts: s.pts.filter(dentro) })).filter(s => s.pts.length));
+    },
+    // posição (fracionária) na lista de datas sob o X da tela
+    posHist(clientX) {
+        const { D } = this.hist, z = this.zoomH || { i0: 0, i1: D.length - 1 };
+        const r = el('gh-box').querySelector('svg').getBoundingClientRect();
+        const frac = ((clientX - r.left) / r.width * 320 - 42) / (320 - 42 - 12);
+        return { frac, i: z.i0 + frac * (z.i1 - z.i0) };
+    },
+    aplicarZoomHist(i0, i1, parcial) {
+        const n = this.hist.D.length - 1, span = Math.max(4, i1 - i0);
+        if (span >= n) this.zoomH = null;
+        else { i0 = Math.max(0, Math.min(n - span, i0)); this.zoomH = { i0, i1: i0 + span }; }
+        if (parcial) {   // durante a pinça: só o gráfico (o quadro que recebe os dedos fica)
+            if (this._rafH) return;
+            this._rafH = requestAnimationFrame(() => { this._rafH = null; el('gh-box').innerHTML = this.histInner(); });
+        } else renderDetalhe();
+    },
+    zoomHist(acao) {
+        const n = this.hist.D.length - 1, z = this.zoomH || { i0: 0, i1: n };
+        const span = z.i1 - z.i0, meio = (z.i0 + z.i1) / 2;
+        if (acao === 'tudo') { this.zoomH = null; return renderDetalhe(); }
+        if (acao === 'mais') return this.aplicarZoomHist(meio - span * 0.3, meio + span * 0.3);
+        if (acao === 'menos') return this.aplicarZoomHist(meio - span * 0.85, meio + span * 0.85);
+        const d = span * 0.35 * (acao === 'esq' ? -1 : 1);
+        this.aplicarZoomHist(z.i0 + d, z.i1 + d);
+    },
+    _ptrH: new Map(),
+    hDown(e) {
+        this._ptrH.set(e.pointerId, e.clientX);
+        if (this._ptrH.size === 2) {
+            const [a, b] = [...this._ptrH.values()], z = this.zoomH || { i0: 0, i1: this.hist.D.length - 1 };
+            this._pincaH = { dist: Math.abs(a - b) || 1, span: z.i1 - z.i0, meio: this.posHist((a + b) / 2).i };
+            try { el('gh-box').setPointerCapture(e.pointerId); } catch (_) { /* ponteiro já solto */ }
+        }
+    },
+    hMove(e) {
+        if (!this._ptrH.has(e.pointerId)) return;
+        this._ptrH.set(e.pointerId, e.clientX);
+        if (this._ptrH.size >= 2 && this._pincaH) {
+            const [a, b] = [...this._ptrH.values()], p = this._pincaH;
+            const span = p.span * p.dist / (Math.abs(a - b) || 1);
+            const { frac } = this.posHist((a + b) / 2);
+            this.aplicarZoomHist(p.meio - frac * span, p.meio - frac * span + span, true);
+        }
+    },
+    hUp(e) {
+        this._ptrH.delete(e.pointerId);
+        if (this._ptrH.size < 2 && this._pincaH) { this._pincaH = null; renderDetalhe(); }
+    },
+    hRoda(e) {   // Ctrl + roda do mouse, ou pinça do touchpad
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+        const n = this.hist.D.length - 1, z = this.zoomH || { i0: 0, i1: n };
+        const { i } = this.posHist(e.clientX), f = Math.exp(e.deltaY * 0.01);
+        this.aplicarZoomHist(i - (i - z.i0) * f, i + (z.i1 - i) * f);
+    },
+
     // Várias praças no mesmo gráfico. series: [{id, cor, pts:[{d, v}]}]
     // Eixo X = todas as datas com cotação em alguma praça; cada linha liga só os dias da sua praça.
     multi(series) {
