@@ -6,9 +6,9 @@ name: Coleta CEASA (computador local)
 # fica na fila e é cancelada pela próxima (não acumula).
 on:
   schedule:
-    # seg-sáb, 12:02 e 18:32 de Brasília (UTC-3), antes da coleta da nuvem (12:17 e 18:47)
-    - cron: "2 15 * * 1-6"
-    - cron: "32 21 * * 1-6"
+    # todo dia, a cada 30 min das 05:15 às 11:45 de Brasília (UTC-3), 15 min antes de cada
+    # coleta da nuvem (05:00-12:00), que publica o que o computador gravou
+    - cron: "15,45 8-14 * * *"
   workflow_dispatch:
     inputs:
       inicio:

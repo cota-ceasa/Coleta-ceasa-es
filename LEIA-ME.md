@@ -31,7 +31,7 @@ coleta/schema.sql        tabelas (criadas sozinhas)
 2. Carga de vários dias: *Run workflow* com `inicio = 2026-08-24` e `max = 60`.
    Cada execução baixa até `max` boletins ainda não coletados (o log diz quantos faltam).
    **Repita até o log mostrar "0 boletins pendentes".** O que já foi coletado não é baixado de novo.
-3. Depois disso o agendamento (seg–sáb, 12:17 e 18:47) busca só os boletins novos.
+3. Depois disso o agendamento (todo dia, a cada 30 min das 05:00 às 12:00) busca só os boletins novos.
    O app é republicado a cada execução.
 
 ## Como funciona a conferência
@@ -78,7 +78,7 @@ e registre em `coleta/ceasas/__init__.py`. Ela aparece sozinha no seletor de loc
 
 O portal rj.gov.br bloqueia os servidores do GitHub. O Rio é coletado pelo workflow
 **Coleta CEASA (computador local)**, que roda num *self-hosted runner* no seu PC
-(seg–sáb, 12:02 e 18:32; o app é publicado pela coleta da nuvem 15 min depois).
+(todo dia, a cada 30 min das 05:15 às 11:45; o app é publicado pela coleta da nuvem 15 min depois).
 
 1. GitHub → Settings → Actions → Runners → **New self-hosted runner** → escolha o sistema
    e rode os comandos mostrados (download + `config`). No `config`, quando pedir
