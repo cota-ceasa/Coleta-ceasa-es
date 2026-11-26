@@ -2,9 +2,9 @@ name: Coleta CEASA
 
 on:
   schedule:
-    # seg-sáb, 12:17 e 18:47 de Brasília (UTC-3)
-    - cron: "17 15 * * 1-6"
-    - cron: "47 21 * * 1-6"
+    # todo dia, a cada 30 min das 05:00 às 12:00 de Brasília (UTC-3 = UTC 08:00-15:00)
+    - cron: "0,30 8-14 * * *"
+    - cron: "0 15 * * *"
   workflow_dispatch:
     inputs:
       discover:
