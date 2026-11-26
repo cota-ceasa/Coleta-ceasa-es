@@ -33,16 +33,20 @@ function semanasPorAno(pts) {
     for (const a in acc) out[a] = semTrechosCurtos(acc[a].map(l => l.length ? l.reduce((x, y) => x + y, 0) / l.length : null));
     return out;
 }
-// semanas isoladas (trecho com menos de 3 semanas seguidas) viram vazio: são pontos perdidos
+// semanas isoladas viram vazio: trecho = semanas com cotação, tolerando 1 semana vazia no meio;
+// trecho com menos de 3 semanas com cotação é ponto perdido
 const SEM_MIN = 3;
 function semTrechosCurtos(s) {
     const out = [...s];
-    let ini = null;
-    for (let w = 0; w <= s.length; w++) {
-        if (w < s.length && s[w] != null) { if (ini == null) ini = w; continue; }
-        if (ini != null && w - ini < SEM_MIN) for (let k = ini; k < w; k++) out[k] = null;
-        ini = null;
-    }
+    let ini = null, ult = null, cont = 0;
+    const fecha = () => { if (ini != null && cont < SEM_MIN) for (let k = ini; k <= ult; k++) out[k] = null; };
+    s.forEach((v, w) => {
+        if (v == null) return;
+        if (ini != null && w - ult > 2) { fecha(); ini = null; }
+        if (ini == null) { ini = w; cont = 0; }
+        ult = w; cont++;
+    });
+    fecha();
     return out;
 }
 // valor da semana w do ano a (w pode passar de 51: vai para o ano seguinte); tolera 1 semana vazia
@@ -55,9 +59,10 @@ function valorSemana(sem, a, w) {
 }
 
 // Elimina pontos soltos (ex.: cotação avulsa fora de safra): só valem trechos com pelo menos
-// 4 cotações, em que entre uma cotação e a seguinte há no máximo 3 boletins sem cotação
-// (produto cotado em dias alternados conta normalmente).
-const SEQ_MIN = 4, FALHA_MAX = 3;
+// 4 cotações, em que entre uma cotação e a seguinte há no máximo 10 boletins (~2 semanas) sem
+// cotação. Assim fica o fim de safra cotado de forma esparsa (ex.: Ponkan 2024) e saem as
+// cotações isoladas a mais de 2 semanas de qualquer outra.
+const SEQ_MIN = 4, FALHA_MAX = 10;
 function serieFiltrada(it, mid) {
     const datas = mercadoPor(mid).datas, out = [];
     let run = [], vazios = 0;
