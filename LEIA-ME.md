@@ -6,6 +6,8 @@ coleta/run.py            baixar boletins -> banco -> padronizar -> docs/dados.js
 coleta/ceasas/es.py      coletor da CEASA-ES (lê a tabela HTML do boletim)
 coleta/ceasas/ba.py      coletor da CEASA-BA/Salvador (baixa os PDFs listados no portal da SDE)
 coleta/ceasas/rj.py      coletor da CEASA-RJ (Cotação -> ano -> mês -> PDF do dia)
+coleta/ceasas/sp.py      coletor da CEAGESP capital (formulário de cotações, todas as categorias por data)
+coleta/ceasas/prohort.py inspeção do painel Prohort/Conab (unidades do interior da CEAGESP)
 coleta/db.py             banco (Postgres via DATABASE_URL, ou SQLite local sem configurar nada)
 coleta/exportar.py       banco -> dados.json
 coleta/schema.sql        tabelas (criadas sozinhas)
@@ -50,6 +52,15 @@ pip install -r requirements.txt && python -m playwright install chromium
 python -m coleta.run --ceasa ES --inicio 2026-10-01 --headed   # sem DATABASE_URL usa o arquivo coleta.db
 python -m http.server -d docs 8000                              # app em http://localhost:8000
 ```
+
+## CEAGESP (São Paulo)
+
+- **Capital** (`SP`): coleta Frutas, Legumes, Verduras, Diversos, Pescados e Orgânicos de cada data
+  publicada (seg, qua e sex). O site só lista os boletins recentes, por isso não há carga histórica longa.
+  Flores ficam de fora; para incluir, defina `CEAGESP_GRUPOS="DIVERSOS,FLORES,FRUTAS,LEGUMES,ORGÂNICOS,PESCADOS,VERDURAS"`.
+  Teste: *Run workflow* com `discover = SP` e confira `sp_resultado.html` no artefato.
+- **Interior** (Ribeirão Preto, Campinas, Sorocaba etc.): a CEAGESP publica no painel Prohort da Conab.
+  Rode *Run workflow* com `discover = PROHORT` e envie `saida/prohort/chamadas.json` para montar o coletor.
 
 ## Adicionar outra CEASA
 

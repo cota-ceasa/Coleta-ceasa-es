@@ -26,7 +26,7 @@ MERCADO_PLANILHA = {
 }
 ROTULOS = {  # id -> nome exibido (o banco tem a sua própria tabela "ceasa")
     "ES": "CEASA - Vitória (ES)",
-    "SP": "CEASA - São Paulo (SP)",
+    "SP": "CEAGESP - São Paulo (SP)",
     "MG": "CEASA - Belo Horizonte (MG)",
 }
 
@@ -35,7 +35,7 @@ GRUPOS = {
                  "Couve-flor", "Espinafre", "Mostarda", "Repolho", "Rúcula", "Serralha", "Taioba", "Salsão"],
     "legumes": ["Abóbora", "Abobrinha", "Aspargo", "Moyashi", "Ervilha Torta", "Moranga", "Palmito", "Berinjela", "Chuchu", "Jiló", "Maxixe", "Milho Verde", "Pepino",
                 "Pimentão Amarelo", "Pimentão Verde", "Pimentão Vermelho", "Quiabo", "Tomate", "Vagem"],
-    "raizes": ["Aipim / Mandioca", "Alho", "Nabo", "Rabanete", "Batata", "Batata Doce", "Beterraba", "Cará", "Cebola",
+    "raizes": ["Aipim / Mandioca", "Alho", "Nabo", "Rabanete", "Batata", "Batata Doce", "Beterraba", "Cará", "Cebola", "Mandioquinha",
                "Cenoura", "Gengibre", "Inhame"],
     "temperos": ["Alecrim", "Alho-poró", "Cheiro Verde", "Colorau", "Louro", "Nirá", "Cebolinha", "Coentro", "Erva Doce", "Hortelã", "Manjericão", "Pimenta", "Salsa",
                  "Sálvia", "Tomilho"],

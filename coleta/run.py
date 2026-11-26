@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 from . import db, juncao
-from .ceasas import REGISTRO
+from .ceasas import INSPECAO, REGISTRO
 from .exportar import exportar
 
 BRT = dt.timezone(dt.timedelta(hours=-3))  # Brasília (sem horário de verão)
@@ -144,7 +144,9 @@ def main():
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=not a.headed)
             browser_p = p
-            c = REGISTRO[a.discover]
+            c = REGISTRO.get(a.discover) or INSPECAO.get(a.discover)
+            if c is None:
+                raise SystemExit(f"sem coletor/inspeção '{a.discover}'. Disponíveis: {list(REGISTRO) + list(INSPECAO)}")
             c.discover(contexto(browser, **getattr(c, "contexto", {})).new_page(), SAIDA)
             browser.close()
         return 0
