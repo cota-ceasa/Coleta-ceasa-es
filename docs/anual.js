@@ -54,14 +54,18 @@ function valorSemana(sem, a, w) {
     return null;
 }
 
-// Só sequências de pelo menos 4 cotações seguidas (dias de boletim consecutivos): pontos soltos,
-// como uma cotação isolada fora de safra, distorcem as médias e a previsão
-const SEQ_MIN = 4;
+// Elimina pontos soltos (ex.: cotação avulsa fora de safra): só valem trechos com pelo menos
+// 4 cotações, em que entre uma cotação e a seguinte há no máximo 3 boletins sem cotação
+// (produto cotado em dias alternados conta normalmente).
+const SEQ_MIN = 4, FALHA_MAX = 3;
 function serieFiltrada(it, mid) {
     const datas = mercadoPor(mid).datas, out = [];
-    let run = [];
+    let run = [], vazios = 0;
     const fecha = () => { if (run.length >= SEQ_MIN) out.push(...run); run = []; };
-    it.m[mid].h.forEach((v, i) => { if (v != null) run.push({ d: datas[i], v }); else fecha(); });
+    it.m[mid].h.forEach((v, i) => {
+        if (v != null) { run.push({ d: datas[i], v }); vazios = 0; }
+        else if (++vazios > FALHA_MAX) { fecha(); vazios = 0; }
+    });
     fecha();
     return out;
 }
@@ -149,7 +153,7 @@ function renderAnual() {
     if (!A) {
         el('vista-detalhe').innerHTML = `
             <button data-act="voltar" class="text-slate-200 hover:text-white font-semibold py-2 pr-3 -ml-1"><i class="fa-solid fa-arrow-left mr-1.5"></i>Voltar</button>
-            <div class="bg-mata-900 border border-mata-800 rounded-2xl p-5 text-slate-300">Este produto não tem nenhuma sequência de pelo menos ${SEQ_MIN} cotações seguidas em ${esc(nomeCurto(merc))}, então não dá para analisar.</div>`;
+            <div class="bg-mata-900 border border-mata-800 rounded-2xl p-5 text-slate-300">Este produto não tem nenhum trecho com pelo menos ${SEQ_MIN} cotações próximas em ${esc(nomeCurto(merc))}, então não dá para analisar.</div>`;
         return;
     }
     const detalhe = it.d.replace(/\bLonga Vida\b/g, 'LV');
@@ -197,7 +201,7 @@ function renderAnual() {
             : `<p class="text-sm text-slate-300"><i class="fa-solid fa-moon text-slate-400 mr-1.5"></i>Fora de safra (última cotação em ${dataBR(A.ult.d)}).</p>
                ${A.proxima ? `<p class="text-sm text-slate-300 mt-2">Nos anos anteriores (${A.usados.join(', ')}), a cotação recomeçou por volta da <b class="text-white">semana de ${dataSem(A.proxima.w)}</b>, com preço inicial em torno de <b class="text-white">${R$(A.proxima.v)}</b> <span class="text-slate-500">(${preco(A.proxima.lo)}–${preco(A.proxima.hi)})</span>.</p>`
                  : '<p class="text-sm text-slate-400 mt-2">Sem anos anteriores suficientes para estimar o início da próxima safra.</p>'}`}
-            <p class="text-[11px] text-slate-500 mt-2">Estimativa a partir dos anos anteriores, só com sequências de ${SEQ_MIN}+ cotações seguidas. Não considera clima ou mercado deste ano; use como referência, não como garantia.</p>
+            <p class="text-[11px] text-slate-500 mt-2">Estimativa a partir dos anos anteriores, sem pontos soltos (trechos com ${SEQ_MIN}+ cotações). Não considera clima ou mercado deste ano; use como referência, não como garantia.</p>
         </div>
 
         <div class="${box} overflow-x-auto">
