@@ -4,7 +4,8 @@ Formulário (POST para a própria página):
   cot_grupo = DIVERSOS | FLORES | FRUTAS | LEGUMES | ORGÂNICOS | PESCADOS | VERDURAS
   cot_data  = dd/mm/aaaa
 As datas disponíveis por categoria vêm no JavaScript da página: var Grupos = {"FRUTAS": [...], ...}
-(só os boletins recentes; o site publica seg, qua e sex).
+(só os boletins recentes; o site publica seg, qua e sex). Datas antigas também são aceitas
+pelo formulário: o coletor tenta todos os dias úteis do período pedido (veja datas()).
 
 Resultado: tabela .contacao_lista, título "Categoria: FRUTAS  Data: 13/11/2026" e colunas
   Produto | Classificação | Uni/Peso | Menor | Comun | Maior | Quilo
@@ -15,6 +16,7 @@ Interior (Ribeirão Preto, Campinas, Sorocaba...): a CEAGESP não publica no pr�
 para o painel Prohort/Conab. Veja ceasas/prohort.py (por ora só inspeção: --discover PROHORT).
 Se o site mudar, rode:  python -m coleta.run --discover SP
 """
+import datetime as dt
 import json
 import os
 import re
@@ -165,9 +167,19 @@ class ColetorSP(Coletor):
         return mapa
 
     def datas(self, page):
+        """O calendário do site só mostra os boletins recentes (var Grupos), mas o formulário aceita
+        datas antigas. Por isso a lista = datas do calendário + todos os dias úteis desde o início
+        pedido (run.py define self.inicio). Dia sem boletim vira 'sem_dados' e não é baixado de novo."""
         mapa = self._mapa(page)
-        todas = sorted(set().union(*mapa.values()))
-        return [(d, d.strftime("%d/%m/%Y")) for d in todas]
+        hoje = dt.date.today()
+        ini = getattr(self, "inicio", None) or hoje - dt.timedelta(days=30)
+        todas = set().union(*mapa.values())
+        d = ini
+        while d <= hoje:
+            if d.weekday() < 5:
+                todas.add(d)
+            d += dt.timedelta(days=1)
+        return [(x, x.strftime("%d/%m/%Y")) for x in sorted(todas)]
 
     def _consultar(self, page, grupo, ref):
         r = page.request.post(URL, form={"cot_grupo": grupo, "cot_data": ref}, timeout=90000)
@@ -176,17 +188,26 @@ class ColetorSP(Coletor):
         return r.text()
 
     def capturar(self, page, ref):
-        """Uma data = todas as categorias. Retorna (html, 'html', linhas) ou None se nada vier."""
+        """Uma data = todas as categorias. Retorna (html, 'html', linhas) ou None se não houver boletim.
+        Data fora do calendário do site: consulta primeiro uma categoria; sem tabela daquele dia, para."""
         d = parse_data(ref)
         mapa = getattr(self, "_grupos", None) or self._mapa(page)
+        grupos = list(mapa)
+        no_calendario = [g for g in grupos if d in mapa[g]]
+        if no_calendario:
+            grupos = no_calendario
+        else:   # data antiga: FRUTAS (ou a 1ª) serve de sonda
+            grupos.sort(key=lambda g: norm(g) != "FRUTAS")
         partes, linhas = [], []
-        for grupo, ds in mapa.items():
-            if d not in ds:
-                continue
+        for n, grupo in enumerate(grupos):
             html = self._consultar(page, grupo, ref)
-            achadas = tabelas(html)
+            achadas = [(g, dt_, rows) for g, dt_, rows in tabelas(html) if rows and dt_ in (None, d)]
+            outras = [dt_ for _g, dt_, _r in tabelas(html) if dt_ and dt_ != d]
+            if outras and not achadas:
+                print(f"[SP] {ref} {grupo}: o site devolveu a tabela de {outras[0]} (sem boletim neste dia)")
             if not achadas:
-                print(f"[SP] {ref} {grupo}: a página não trouxe tabela de cotação")
+                if n == 0 and not no_calendario:
+                    return None   # a sonda não achou boletim: dia sem cotação
                 continue
             for g, data_tab, rows in achadas:
                 linhas.append((len(partes) + 1, 0, "html", ["#DATA", g or grupo,

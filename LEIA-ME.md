@@ -65,7 +65,10 @@ repetindo até zerar os pendentes. Teste: `discover = CWB`.
 ## CEAGESP (São Paulo)
 
 - **Capital** (`SP`): coleta Frutas, Legumes, Verduras, Diversos, Pescados e Orgânicos de cada data
-  publicada (seg, qua e sex). O site só lista os boletins recentes, por isso não há carga histórica longa.
+  publicada (seg, qua e sex). O calendário do site só mostra os boletins recentes, mas o formulário aceita
+  datas antigas: o coletor tenta todos os dias úteis do período (dia sem boletim custa 1 consulta e vira
+  `sem_dados`). Carga de anos anteriores: *Run workflow* com `inicio = 2020-01-01` (por exemplo) e repita
+  até zerar os pendentes.
   Flores ficam de fora; para incluir, defina `CEAGESP_GRUPOS="DIVERSOS,FLORES,FRUTAS,LEGUMES,ORGÂNICOS,PESCADOS,VERDURAS"`.
   Teste: *Run workflow* com `discover = SP` e confira `sp_resultado.html` no artefato.
 - **Interior** (Ribeirão Preto, Campinas, Sorocaba etc.): a CEAGESP publica no painel Prohort da Conab.
