@@ -25,7 +25,7 @@ on:
         required: false
         default: ""
       max:
-        description: "Máximo de boletins novos POR CEASA nesta execução (são 8 CEASAs: use 40 ao carregar histórico)"
+        description: "Máximo de boletins novos POR CEASA nesta execução (são 9 praças: use 40 ao carregar histórico)"
         required: false
         default: "60"
       renormalizar:

@@ -6,6 +6,7 @@ coleta/run.py            baixar boletins -> banco -> padronizar -> docs/dados.js
 coleta/ceasas/es.py      coletor da CEASA-ES (lê a tabela HTML do boletim)
 coleta/ceasas/ba.py      coletor da CEASA-BA/Salvador (baixa os PDFs listados no portal da SDE)
 coleta/ceasas/rj.py      coletor da CEASA-RJ (Cotação -> ano -> mês -> PDF do dia)
+coleta/ceasas/pr.py      coletor da CEASA-PR: 5 unidades (página do ano -> unidade -> mês -> PDF do dia)
 coleta/ceasas/sp.py      coletor da CEAGESP capital (formulário de cotações, todas as categorias por data)
 coleta/ceasas/prohort.py inspeção do painel Prohort/Conab (unidades do interior da CEAGESP)
 coleta/db.py             banco (Postgres via DATABASE_URL, ou SQLite local sem configurar nada)
@@ -52,6 +53,14 @@ pip install -r requirements.txt && python -m playwright install chromium
 python -m coleta.run --ceasa ES --inicio 2026-10-01 --headed   # sem DATABASE_URL usa o arquivo coleta.db
 python -m http.server -d docs 8000                              # app em http://localhost:8000
 ```
+
+## CEASA-PR (5 unidades)
+
+Curitiba (`CWB`), Maringá (`MGA`), Londrina (`LDA`), Foz do Iguaçu (`FOZ`) e Cascavel (`CVL`) aparecem
+como praças separadas no app. A lista vem de `ceasa.pr.gov.br/Pagina/Cotacao-Diaria-de-Precos-<ano>`;
+o PDF de cada dia é conferido pela data e pelo nome da unidade no cabeçalho (outro = `revisar`).
+Flores e plantas ornamentais ficam de fora. Carga do ano: *Run workflow* com `inicio = 2026-01-02`,
+repetindo até zerar os pendentes. Teste: `discover = CWB`.
 
 ## CEAGESP (São Paulo)
 
