@@ -88,6 +88,11 @@ def padronizar_legado(conn, aplicar=True):
     for ceasa, prod, det, p2, d2 in trocas:
         print(f"[nome] {ceasa} «{prod}» «{det}» -> «{p2}» «{d2}»")
         if aplicar:
+            # dias em que o nome padrão já tem a mesma cotação: fica a do nome padrão (evita chave duplicada)
+            conn.executar("DELETE FROM cotacao AS c WHERE c.ceasa_id = %s AND c.produto = %s AND c.detalhe = %s AND EXISTS ("
+                          "SELECT 1 FROM cotacao n WHERE n.ceasa_id = c.ceasa_id AND n.data = c.data "
+                          "AND n.produto = %s AND n.detalhe = %s AND n.embalagem = c.embalagem)",
+                          (ceasa, prod, det, p2, d2))
             conn.executar("UPDATE cotacao SET produto = %s, detalhe = %s WHERE ceasa_id = %s AND produto = %s AND detalhe = %s",
                           (p2, d2, ceasa, prod, det))
     if aplicar and trocas:
@@ -169,6 +174,11 @@ def detectar(conn, aplicar=True):
         for (ceasa, p1, d1, e1, p2, d2, e2, f, motivo) in juncoes:
             conn.executar("INSERT INTO juncao VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                           (ceasa, p1, d1, e1, p2, d2, e2, f, motivo, agora))
+            # a nova pode começar até 3 dias antes do fim da antiga: nos dias em comum fica a nova
+            conn.executar("DELETE FROM cotacao AS c WHERE c.ceasa_id = %s AND c.produto = %s AND c.detalhe = %s "
+                          "AND c.embalagem = %s AND EXISTS (SELECT 1 FROM cotacao n WHERE n.ceasa_id = c.ceasa_id "
+                          "AND n.data = c.data AND n.produto = %s AND n.detalhe = %s AND n.embalagem = %s)",
+                          (ceasa, p1, d1, e1, p2, d2, e2))
             conn.executar("UPDATE cotacao SET produto = %s, detalhe = %s, embalagem = %s, "
                           "minimo = minimo * %s, comum = comum * %s, maximo = maximo * %s "
                           "WHERE ceasa_id = %s AND produto = %s AND detalhe = %s AND embalagem = %s",

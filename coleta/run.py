@@ -210,10 +210,18 @@ def main():
         normalizar(conn, c)
     if not a.sem_exportar:   # só na nuvem, com todas as praças normalizadas
         aplicar = os.environ.get("JUNCOES", "aplicar") != "simular"
-        juncao.padronizar_legado(conn, aplicar)   # nomes antigos fora do padrão -> padrão (une as séries)
-        juncao.detectar(conn, aplicar)            # troca de nome no boletim -> junta na série nova
+        try:   # junção é melhoria: se falhar, o app ainda é publicado com os dados novos
+            juncao.padronizar_legado(conn, aplicar)   # nomes antigos fora do padrão -> padrão (une as séries)
+            juncao.detectar(conn, aplicar)            # troca de nome no boletim -> junta na série nova
+        except Exception as e:  # noqa: BLE001
+            falhas_juncao = e
+            log(f"[junção] FALHOU, publicando mesmo assim: {e}")
+        else:
+            falhas_juncao = None
         exportar(conn, a.json)
     conn.close()
+    if not a.sem_exportar and falhas_juncao:   # aviso amarelo no GitHub, sem impedir a publicação
+        print(f"::warning::junção de séries falhou: {falhas_juncao}")
     return 1 if (falhas == len(alvo) and not a.renormalizar) else 0  # erro só se todas falharem (o GitHub avisa por e-mail)
 
 
