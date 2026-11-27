@@ -136,7 +136,16 @@ def monitorar(uma_vez=False):
         browser = p.chromium.launch()
         while True:
             inicio = time.time()
-            rodada(browser, conn)
+            try:
+                rodada(browser, conn)
+            except Exception as e:  # noqa: BLE001  (o Neon fecha conexão parada; reconecta e segue)
+                print(f"{agora():%H:%M} conexão com o banco perdida ({str(e).splitlines()[0]}); reconectando")
+                try:
+                    conn.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                conn = db.conectar()
+                rodada(browser, conn)
             if uma_vez:
                 break
             prox = inicio + INTERVALO
