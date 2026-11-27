@@ -31,6 +31,15 @@ JANELA_ANTES, JANELA_DEPOIS = 3, 45
 MIN_ANTIGA, MIN_NOVA = 10, 4
 RAZAO_MIN, RAZAO_MAX = 0.75, 1.33
 
+# Séries antigas que NÃO podem ser juntadas a outra (junção errada, validada à mão).
+# Se já tiverem sido juntadas, desfazer_bloqueadas() reverte na próxima execução.
+NAO_JUNTAR = {
+    ("SP", "Pescada", "BRANCA MEDIA", "KG"),            # virou GOETE G: espécie diferente
+    ("SP", "Pescada", "BRANCA MIUDA", "KG"),            # virou GOETE M: espécie diferente
+    ("SP", "Abacate", "OURO VERDE B BOCA 11 E 12", "KG"),  # virou GEADA: variedade diferente
+    ("SP", "Namorado", "GRANDE", "KG"),                 # virou M: tamanho diferente
+}
+
 
 def _d(v):
     return v if isinstance(v, dt.date) else dt.date.fromisoformat(str(v)[:10])
@@ -116,6 +125,8 @@ def detectar(conn, aplicar=True):
     juncoes = []
     usadas = set()
     for (ceasa, prod, det, emb), pa in series.items():
+        if (ceasa, prod, det, emb) in NAO_JUNTAR:
+            continue
         ua = emb_info(emb)[0]
         fim_a = pa[-1][0]
         if len(pa) < MIN_ANTIGA or (fim_mercado[ceasa] - fim_a).days < PAROU_DIAS:
@@ -188,3 +199,74 @@ def detectar(conn, aplicar=True):
     elif not juncoes:
         print("[junção] nenhuma troca de nome encontrada")
     return juncoes
+
+
+def _fim_e_gap(motivo):
+    """'antiga parou em 24/08/2022; nova começou +2 dias depois; ...' -> (date, 2)"""
+    import re
+    m = re.search(r"parou em (\d{2}/\d{2}/\d{4}).*?começou ([+-]?\d+) dias", motivo or "")
+    return (dt.datetime.strptime(m.group(1), "%d/%m/%Y").date(), int(m.group(2))) if m else (None, None)
+
+
+def desfazer_bloqueadas(conn):
+    """Reverte junções já aplicadas cuja série antiga está em NAO_JUNTAR: as cotações anteriores
+    ao início da série nova voltam ao nome antigo (preço / fator). Nos dias em que as duas se
+    sobrepunham a antiga já tinha sido descartada; ficam com a nova."""
+    conn.executar(SQL_TABELA)
+    feitas = 0
+    for ceasa, p1, d1, e1, p2, d2, e2, f, motivo in conn.consultar(
+            "SELECT ceasa_id, produto_de, detalhe_de, embalagem_de, produto_para, detalhe_para, embalagem_para, "
+            "fator, motivo FROM juncao"):
+        if (ceasa, p1, d1, e1) not in NAO_JUNTAR:
+            continue
+        fim, gap = _fim_e_gap(motivo)
+        if fim is None:
+            print(f"[desfazer] {ceasa} {p1} «{d1}»: motivo sem datas, revise à mão: {motivo}")
+            continue
+        corte = fim + dt.timedelta(days=min(1, gap))   # datas < corte eram da série antiga
+        cur = conn.executar(
+            "UPDATE cotacao SET produto = %s, detalhe = %s, embalagem = %s, "
+            "minimo = minimo / %s, comum = comum / %s, maximo = maximo / %s "
+            "WHERE ceasa_id = %s AND produto = %s AND detalhe = %s AND embalagem = %s AND data < %s",
+            (p1, d1, e1, f, f, f, ceasa, p2, d2, e2, conn.d(corte)))
+        conn.executar("DELETE FROM juncao WHERE ceasa_id = %s AND produto_de = %s AND detalhe_de = %s "
+                      "AND embalagem_de = %s", (ceasa, p1, d1, e1))
+        feitas += 1
+        print(f"[desfazer] {ceasa} {p1} «{d1}» [{e1}] <- «{d2}» [{e2}]: {cur.rowcount} cotações devolvidas")
+    conn.commit()
+    return feitas
+
+
+def listar(conn):
+    """Tabela (markdown) de todas as junções registradas, com início/fim de cada série."""
+    conn.executar(SQL_TABELA)
+    js = conn.consultar(
+        "SELECT ceasa_id, produto_de, detalhe_de, embalagem_de, produto_para, detalhe_para, embalagem_para, "
+        "fator, motivo, criado_em FROM juncao ORDER BY ceasa_id, produto_de, detalhe_de")
+    out = ["| # | Praça | Produto | Série antiga | Antiga parou | Série nova | Nova começou | Preço nova/antiga | Fator emb. | Juntada em |",
+           "|---|---|---|---|---|---|---|---|---|---|"]
+    for i, (ceasa, p1, d1, e1, p2, d2, e2, f, motivo, criado) in enumerate(js, 1):
+        fim, gap = _fim_e_gap(motivo)
+        import re
+        r = re.search(r"= ([\d.]+)", motivo or "")
+        out.append(f"| {i} | {ceasa} | {p1}{'' if p2 == p1 else ' → ' + p2} | {d1} [{e1}] | "
+                   f"{fim:%d/%m/%Y} | {d2} [{e2}] | {(fim + dt.timedelta(days=gap)):%d/%m/%Y} | "
+                   f"{r.group(1) if r else '?'} | {float(f):g} | {str(criado)[:10]} |" if fim else
+                   f"| {i} | {ceasa} | {p1} | {d1} [{e1}] | ? | {d2} [{e2}] | ? | ? | {float(f):g} | {motivo} |")
+    return "\n".join(out), len(js)
+
+
+if __name__ == "__main__":   # python -m coleta.juncao [--desfazer]: lista as junções (e reverte as bloqueadas)
+    import os
+    import sys
+
+    from . import db
+    conn = db.conectar()
+    if "--desfazer" in sys.argv:
+        desfazer_bloqueadas(conn)
+    tabela, n = listar(conn)
+    print(tabela)
+    if os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as fh:
+            fh.write(f"## Junções de séries ({n})\n\n{tabela}\n")
+    conn.close()

@@ -211,6 +211,8 @@ def main():
     if not a.sem_exportar:   # só na nuvem, com todas as praças normalizadas
         aplicar = os.environ.get("JUNCOES", "aplicar") != "simular"
         try:   # junção é melhoria: se falhar, o app ainda é publicado com os dados novos
+            if aplicar:
+                juncao.desfazer_bloqueadas(conn)      # reverte junções marcadas como erradas (NAO_JUNTAR)
             juncao.padronizar_legado(conn, aplicar)   # nomes antigos fora do padrão -> padrão (une as séries)
             juncao.detectar(conn, aplicar)            # troca de nome no boletim -> junta na série nova
         except Exception as e:  # noqa: BLE001
