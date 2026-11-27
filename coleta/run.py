@@ -119,7 +119,12 @@ def normalizar(conn, c):
     mapa = juncao.carregar(conn)   # nomes antigos já juntados a um nome novo
     n = 0
     for d in pend:
-        r = normalizar_dia(conn, c, d, mapa)
+        try:
+            r = normalizar_dia(conn, c, d, mapa)
+        except Exception as e:  # noqa: BLE001  (um boletim com problema não impede publicar os demais)
+            log(f"[{c.id}] {d} FALHA ao normalizar ({str(e).splitlines()[0]}); fica pendente")
+            print(f"::warning::[{c.id}] {d} falhou ao normalizar: {str(e).splitlines()[0]}")
+            continue
         if r is None:
             print(f"[{c.id}] parser ainda não implementado: {len(pend)} boletins aguardando normalização")
             return

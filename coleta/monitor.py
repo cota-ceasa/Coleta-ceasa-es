@@ -144,8 +144,11 @@ def monitorar(uma_vez=False):
                     conn.close()
                 except Exception:  # noqa: BLE001
                     pass
-                conn = db.conectar()
-                rodada(browser, conn)
+                try:   # se falhar de novo, pula esta rodada em vez de derrubar o monitor inteiro
+                    conn = db.conectar()
+                    rodada(browser, conn)
+                except Exception as e2:  # noqa: BLE001
+                    print(f"{agora():%H:%M} rodada perdida ({str(e2).splitlines()[0]}); tenta na próxima")
             if uma_vez:
                 break
             prox = inicio + INTERVALO

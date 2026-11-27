@@ -46,10 +46,27 @@ class ColetorES(Coletor):
             page.wait_for_timeout(500)
         return False
 
-    def _abrir(self, page):
-        page.goto(URL, wait_until="networkidle", timeout=60000)
-        if not self._contar(page, SEL_MERCADO):
-            raise RuntimeError("formulário mudou: select de mercado não encontrado (rode --discover ES)")
+    def _abrir(self, page, tentativas=3):
+        # De madrugada (~05:30-06:30) o site do ES costuma abrir sem o formulário por alguns
+        # minutos. Recarrega algumas vezes antes de desistir e diferencia "fora do ar" de "mudou".
+        for t in range(tentativas):
+            try:
+                page.goto(URL, wait_until="networkidle", timeout=60000)
+                if self._contar(page, SEL_MERCADO):
+                    break
+            except Exception:  # noqa: BLE001 (timeout / site fora do ar: tenta de novo)
+                if t == tentativas - 1:
+                    raise
+            if t < tentativas - 1:
+                page.wait_for_timeout(20000)
+        else:
+            try:
+                tem_select = page.locator("select").count() > 0
+            except Exception:  # noqa: BLE001
+                tem_select = False
+            if tem_select:
+                raise RuntimeError("formulário mudou: select de mercado não encontrado (rode --discover ES)")
+            raise RuntimeError("site do ES abriu sem o formulário (instabilidade do site; tenta na próxima execução)")
         valor = MERCADO_ID
         for o in page.locator(f"{SEL_MERCADO} option").all():  # confirma pelo nome, se o código mudar
             if "GRANDE VIT" in o.inner_text().upper():
