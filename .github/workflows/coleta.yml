@@ -28,6 +28,10 @@ on:
         description: "Máximo de boletins novos POR CEASA nesta execução (são 9 praças: use 40 ao carregar histórico)"
         required: false
         default: "60"
+      limite_min:
+        description: "Minutos baixando boletins antes de parar e publicar (máx. 330). Vazio = 100"
+        required: false
+        default: ""
       renormalizar:
         description: "Refazer a padronização dos boletins já baixados (sem baixar de novo)"
         type: boolean
@@ -49,7 +53,7 @@ concurrency:
 jobs:
   coleta:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: ${{ inputs.limite_min != '' && inputs.limite_min != null && 360 || 120 }}
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url || steps.deploy2.outputs.page_url }}
@@ -96,7 +100,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           PYTHONUNBUFFERED: "1"
-          LIMITE_MIN: "100"   # job tem 120 min: sobra tempo p/ normalizar, exportar e publicar
+          LIMITE_MIN: ${{ inputs.limite_min || '100' }}   # job tem 120 min (360 se informado): sobra tempo p/ publicar
           INICIO: ${{ inputs.inicio }}
           JUNCOES: ${{ inputs.juncoes_simular && 'simular' || 'aplicar' }}
           MAXIMO: ${{ inputs.max }}
