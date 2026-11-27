@@ -34,8 +34,24 @@ def lista_datas(datas):
     return "\n".join("      " + ", ".join(ds[i:i + 8]) for i in range(0, len(ds), 8))
 
 
-def coletar(c, page, conn, inicio, fim, maximo):
+def normalizar_dia(conn, c, d, mapa):
+    """Normaliza um boletim já gravado. True se gravou cotações; None se o parser não existe."""
+    brutas = db.linhas(conn, c.id, d)
+    if not brutas:  # boletim antigo sem linhas guardadas: mantém as cotações que já existem
+        print(f"[{c.id}] {d}: sem linhas brutas guardadas, cotações existentes mantidas")
+        return False
+    cots = c.normalizar(brutas, d)
+    if cots is None:
+        return None
+    db.gravar_cotacoes(conn, c.id, d, juncao.aplicar_em(cots, c.id, mapa))
+    log(f"[{c.id}] normalizado {d}: {len(cots)} cotações ({sum(1 for x in cots if x['conferencia'] == 'validado')} validadas)")
+    return True
+
+
+def coletar(c, page, conn, inicio, fim, maximo, prazo=None):
     feitas = db.datas_resolvidas(conn, c.id)
+    mapa = juncao.carregar(conn)
+    sem_parser = False
     c.inicio = inicio  # coletores que navegam por ano/mês (RJ) pulam o que é anterior
     no_site = c.datas(page)
     pend = [(d, ref) for d, ref in no_site if inicio <= d <= fim and d not in feitas]
@@ -55,6 +71,10 @@ def coletar(c, page, conn, inicio, fim, maximo):
     cont = {"ok": 0, "sem_dados": 0, "erro": 0}
     seguidos = 0
     for n, (d, ref) in enumerate(lote, 1):
+        if prazo and dt.datetime.now(BRT) >= prazo:
+            # sobra tempo para normalizar, exportar e publicar antes do timeout do job
+            log(f"[{c.id}] limite de tempo da execução atingido; o restante fica para a próxima.")
+            break
         log(f"[{c.id}] ({n}/{len(lote)}) coletando {d} ...")
         t0 = dt.datetime.now()
         try:
@@ -82,6 +102,12 @@ def coletar(c, page, conn, inicio, fim, maximo):
         db.gravar_boletim(conn, c.id, d, "ok", hashlib.sha256(bruto).hexdigest(), linhas)
         cont["ok"] += 1
         log(f"[{c.id}] ({n}/{len(lote)}) {d} OK: {len(linhas)} linhas gravadas ({seg:.0f}s)")
+        # normaliza já: se o job for interrompido, o que foi baixado já está em 'cotacao'
+        if not sem_parser:
+            try:
+                sem_parser = normalizar_dia(conn, c, d, mapa) is None
+            except Exception as e:  # noqa: BLE001  (fica pendente; normalizar() tenta no fim)
+                log(f"[{c.id}] {d} falha ao normalizar agora ({e}); tenta de novo no fim")
         page.wait_for_timeout(1500)  # pausa educada com o servidor
     feitos = cont["ok"] + cont["sem_dados"] + cont["erro"]
     log(f"[{c.id}] RESUMO: {cont['ok']} coletados, {cont['sem_dados']} sem boletim, {cont['erro']} com erro "
@@ -93,17 +119,11 @@ def normalizar(conn, c):
     mapa = juncao.carregar(conn)   # nomes antigos já juntados a um nome novo
     n = 0
     for d in pend:
-        brutas = db.linhas(conn, c.id, d)
-        if not brutas:  # boletim antigo sem linhas guardadas: mantém as cotações que já existem
-            print(f"[{c.id}] {d}: sem linhas brutas guardadas, cotações existentes mantidas")
-            continue
-        cots = c.normalizar(brutas, d)
-        if cots is None:
+        r = normalizar_dia(conn, c, d, mapa)
+        if r is None:
             print(f"[{c.id}] parser ainda não implementado: {len(pend)} boletins aguardando normalização")
             return
-        db.gravar_cotacoes(conn, c.id, d, juncao.aplicar_em(cots, c.id, mapa))
-        n += 1
-        log(f"[{c.id}] normalizado {d}: {len(cots)} cotações ({sum(1 for x in cots if x['conferencia'] == 'validado')} validadas)")
+        n += r
     if n:
         log(f"[{c.id}] {n} boletins normalizados")
 
@@ -123,6 +143,9 @@ def main():
     ap.add_argument("--diagnostico", action="store_true", help="testa se o site das CEASAs abre (computador x Android) e sai")
     ap.add_argument("--perfil", choices=["computador", "android"], default="computador", help="navegador que a coleta simula")
     ap.add_argument("--renormalizar", action="store_true", help="refaz a padronização de todos os boletins já baixados (sem baixar de novo)")
+    ap.add_argument("--limite-min", type=float, default=float(os.environ.get("LIMITE_MIN") or 0),
+                    help="para de baixar após N minutos (deixa folga p/ normalizar e publicar antes\n"
+                         "do timeout do job). 0 = sem limite")
     ap.add_argument("--headed", action="store_true", help="mostra o navegador (uso local)")
     a = ap.parse_args()
 
@@ -162,6 +185,7 @@ def main():
     hoje = dt.datetime.now(BRT).date()
     inicio = dt.date.fromisoformat(a.inicio) if a.inicio else hoje - dt.timedelta(days=30)
 
+    prazo = dt.datetime.now(BRT) + dt.timedelta(minutes=a.limite_min) if a.limite_min > 0 else None
     conn = db.conectar()
     db.registrar_ceasas(conn, alvo)
     if a.renormalizar:
@@ -174,7 +198,7 @@ def main():
         for c in ([] if a.renormalizar else alvo):  # uma CEASA com problema não derruba as outras
             ctx = contexto(browser, accept_downloads=True, **getattr(c, "contexto", {}))  # o site usa certificado de IP
             try:
-                coletar(c, ctx.new_page(), conn, inicio, hoje, a.max)
+                coletar(c, ctx.new_page(), conn, inicio, hoje, a.max, prazo)
             except Exception as e:  # noqa: BLE001
                 falhas += 1
                 print(f"[{c.id}] FALHOU: {e}")

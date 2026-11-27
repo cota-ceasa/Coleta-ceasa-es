@@ -48,6 +48,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           PYTHONUNBUFFERED: "1"
           PYTHONIOENCODING: "utf-8"
+          LIMITE_MIN: "75"   # job tem 90 min: sobra tempo p/ normalizar
         run: python -m coleta.run --onde local --sem-exportar --max ${{ inputs.max || '60' }} ${{ inputs.inicio && format('--inicio {0}', inputs.inicio) || '' }}
 
       - name: Guardar boletins brutos

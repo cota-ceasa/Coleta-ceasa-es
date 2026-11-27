@@ -96,6 +96,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           PYTHONUNBUFFERED: "1"
+          LIMITE_MIN: "100"   # job tem 120 min: sobra tempo p/ normalizar, exportar e publicar
           INICIO: ${{ inputs.inicio }}
           JUNCOES: ${{ inputs.juncoes_simular && 'simular' || 'aplicar' }}
           MAXIMO: ${{ inputs.max }}
