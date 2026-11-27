@@ -63,7 +63,13 @@ def carregar(conn):
 
 
 def aplicar_em(cotacoes, ceasa, mapa):
-    """Renomeia (e converte o preço de embalagem) nas cotações recém-normalizadas."""
+    """Renomeia (e converte o preço de embalagem) nas cotações recém-normalizadas.
+    Se no mesmo boletim já existe a série com o nome novo (as duas se sobrepõem por alguns dias),
+    fica a do nome novo e a renomeada é descartada — igual a detectar(). Sem isso o banco
+    recusa a gravação (chave duplicada) e a coleta inteira para."""
+    chave = lambda c: (c["produto"], c["detalhe"], c["embalagem"])
+    originais = {chave(c) for c in cotacoes if (ceasa, *chave(c)) not in mapa}
+    out, vistas = [], set()
     for c in cotacoes:
         alvo = mapa.get((ceasa, c["produto"], c["detalhe"], c["embalagem"]))
         if alvo:
@@ -71,7 +77,13 @@ def aplicar_em(cotacoes, ceasa, mapa):
             for campo in ("minimo", "comum", "maximo"):
                 if c.get(campo) is not None:
                     c[campo] = round(float(c[campo]) * f, 4)
-    return cotacoes
+            if chave(c) in originais or chave(c) in vistas:
+                continue
+        elif chave(c) in vistas:
+            continue
+        vistas.add(chave(c))
+        out.append(c)
+    return out
 
 
 def padronizar_legado(conn, aplicar=True):
