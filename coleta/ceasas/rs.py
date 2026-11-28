@@ -3,7 +3,10 @@
 Página de cotações (portal do governo do RS):
   https://www.ceasa.rs.gov.br/cotacoes-de-precos
 Estrutura: um painel por ano ("2026") com um link por mês ("NOVEMBRO") para uma pasta pública do
-Google Drive. Dentro da pasta, um PDF por dia: "Cotacao 16/11/2026.pdf" (a data vem do nome).
+Google Drive. Dentro da pasta, um arquivo por dia; a data vem do nome. Desde jul/2026 é PDF
+("Cotacao 16/11/2026.pdf"); antes, planilha do Google ("Cotação 09/02/2026", "Cotação 31-01-2025"),
+baixada como .xlsx (mesmas colunas). Alguns links apontam para a pasta do ANO ("2026"), que contém
+as pastas dos meses ("02/2026 Fevereiro"): as subpastas são percorridas.
 A pasta é listada pela visão embutida do Drive (embeddedfolderview, HTML simples); se ela falhar,
 pela página normal da pasta. O PDF é baixado pelo link público de download.
 
@@ -52,6 +55,7 @@ PASTAS_CONHECIDAS = {
 APELIDOS = {
     "AIPO SALSAO": "Salsão",
     "RADITE ALMEIRAO": "Almeirão",
+    "ALMEIRAO RADITE": "Almeirão",
     "RADITE": "Almeirão",
     "TEMPERO VERDE": "Cheiro Verde",
     "BANANA CATURRA NANICA": "Banana Nanica",
@@ -68,11 +72,13 @@ APELIDOS = {
     "MAMAO AMAZONAS": "Mamão Havaí",
     "PESSEGO": "Pêssego",
     "OVO": "Ovos",
+    "BANANA DA TERRA E OUTRAS": "Banana Terra",
+    "BANANA DA TERRA": "Banana Terra",
     "CACAO FILE": "Cação",            # 'Filé de Cação' (sem isto casaria com 'Cacau')
     "CACAO": "Cação",
     "LOMBO DE BACALHAU": "Bacalhau",
 }
-SECOES_FORA = ("CENTRAL DE FLORES", "FLORES", "CARNES")
+SECOES_FORA = ("FLORES", "CARNES")   # basta conter ('CENTRAL DE FLORES', 'CENTRAL DAS FLORES')
 PRECO = re.compile(r"^\d{1,3}(?:[.,]\d{3})*[.,]\d{2}$|^\d+[.,]\d{2}$")
 _CACHE = {}   # índice da página (ano, mês) -> id da pasta
 
@@ -158,13 +164,15 @@ class ColetorRS(ColetorBA):
         return _CACHE[URL]
 
     def _listar_pasta(self, page, pasta):
-        """[(id do arquivo, nome)] da pasta pública do Drive."""
+        """[(id, nome, tipo)] da pasta pública do Drive; tipo: 'pasta', 'pdf', 'planilha', 'xlsx' ou ''."""
         itens = []
         try:
             r = page.request.get(f"https://drive.google.com/embeddedfolderview?id={pasta}", timeout=60000)
             if r.ok:
                 html = r.text()
-                itens = re.findall(r'id="entry-([\w-]+)".*?class="flip-entry-title"[^>]*>(.*?)</div>', html, re.S)
+                for m in re.finditer(r'id="entry-([\w-]+)"(.*?)class="flip-entry-title"[^>]*>(.*?)</div>', html, re.S):
+                    href = re.search(r'href="([^"]+)"', m.group(2))
+                    itens.append((m.group(1), m.group(3), href.group(1) if href else ""))
         except Exception as e:  # noqa: BLE001
             print(f"[RS] visão embutida da pasta {pasta} falhou ({str(e).splitlines()[0]}); tentando a página da pasta")
         if not itens:   # alternativa: página normal da pasta (precisa de JavaScript)
@@ -179,33 +187,42 @@ class ColetorRS(ColetorBA):
                 for (const e of document.querySelectorAll('[data-id]')) {
                     const id = e.getAttribute('data-id');
                     const t = (e.getAttribute('aria-label') || e.innerText || '').split('\\n')[0].trim();
-                    if (id && t && !out[id]) out[id] = t;
+                    if (id && t && !out[id]) out[id] = [id, t, ''];
                 }
-                return Object.entries(out);
+                return Object.values(out);
             }""")
-        return [(i, unescape(re.sub(r"<[^>]+>", "", n)).strip()) for i, n in itens]
+        out = []
+        for i, n, href in itens:
+            nome = unescape(re.sub(r"<[^>]+>", "", n)).strip()
+            out.append((i, nome, tipo_arquivo(nome, href)))
+        return out
 
     def datas(self, page):
         hoje = dt.date.today()
         ini = getattr(self, "inicio", None) or hoje - dt.timedelta(days=30)
         pastas = self._pastas(page)
-        out, sem_data = {}, []
-        for (ano, mes), pasta in sorted(pastas.items()):
-            if (ano, mes) < (ini.year, ini.month) or (ano, mes) > (hoje.year, hoje.month):
+        no_periodo = lambda am: (ini.year, ini.month) <= am <= (hoje.year, hoje.month)
+        fila = [pid for am, pid in sorted(pastas.items()) if no_periodo(am)]
+        vistas, out, sem_data = set(), {}, []
+        while fila:
+            pasta = fila.pop(0)
+            if pasta in vistas:
                 continue
-            for fid, nome in self._listar_pasta(page, pasta):
-                if not nome.lower().endswith(".pdf"):
+            vistas.add(pasta)
+            for fid, nome, tipo in self._listar_pasta(page, pasta):
+                if tipo == "pasta":   # pasta do ano com as pastas dos meses ("02/2026 Fevereiro")
+                    m = re.search(r"(\d{1,2})\s*/\s*(\d{4})", nome)
+                    if m and no_periodo((int(m.group(2)), int(m.group(1)))):
+                        fila.append(fid)
                     continue
-                m = re.search(r"(\d{1,2})[/_.\-](\d{1,2})[/_.\-](\d{4}|\d{2})", nome)
-                try:
-                    d = dt.date(int(m.group(3)) + (2000 if len(m.group(3)) == 2 else 0),
-                                int(m.group(2)), int(m.group(1))) if m else None
-                except ValueError:
-                    d = None
+                if not tipo:
+                    continue
+                d = data_do_nome(nome)
                 if d is None:
                     sem_data.append(nome)
                     continue
-                out[d] = fid   # nome repetido: vale o último da lista
+                if d not in out or tipo == "pdf":   # mesmo dia em PDF e planilha: fica o PDF
+                    out[d] = f"{tipo}:{fid}"
         if sem_data:
             print(f"[RS] {len(sem_data)} arquivo(s) sem data no nome, ignorados: {sem_data[:5]}")
         if not out and not pastas:
@@ -225,28 +242,49 @@ class ColetorRS(ColetorBA):
                 ultimo = f"HTTP {r.status}"
                 continue
             corpo = r.body()
-            if corpo.startswith(b"%PDF"):
+            if corpo.startswith((b"%PDF", b"PK")):   # PDF ou .xlsx
                 return corpo
             html = corpo.decode("utf-8", "replace")   # aviso "não foi possível verificar vírus": confirma
             acao = re.search(r'<form[^>]+action="([^"]+)"', html)
             if acao:
                 campos = dict(re.findall(r'<input[^>]+name="([^"]+)"[^>]+value="([^"]*)"', html))
                 r2 = page.request.get(unescape(acao.group(1)) + "?" + urlencode(campos), timeout=90000)
-                if r2.ok and r2.body().startswith(b"%PDF"):
+                if r2.ok and r2.body().startswith((b"%PDF", b"PK")):
                     return r2.body()
             ultimo = "resposta não é PDF"
         if ultimo:
             raise RuntimeError(f"download do Drive falhou ({ultimo}) para o arquivo {fid}")
         return None
 
+    def _baixar_planilha(self, page, fid):
+        """Planilha do Google exportada como .xlsx; None se não existir."""
+        r = page.request.get(f"https://docs.google.com/spreadsheets/d/{fid}/export?format=xlsx", timeout=90000)
+        if r.status == 404:
+            return None
+        if not r.ok:
+            raise RuntimeError(f"exportação da planilha falhou (HTTP {r.status}) para {fid}")
+        corpo = r.body()
+        if not corpo.startswith(b"PK"):
+            raise RuntimeError(f"exportação da planilha não veio em .xlsx para {fid}")
+        return corpo
+
     def capturar(self, page, ref):
-        corpo = self._baixar_drive(page, ref)
+        tipo, _, fid = ref.rpartition(":")
+        tipo = tipo or "pdf"   # referência antiga (só o id) = PDF
+        if tipo == "planilha":
+            corpo = self._baixar_planilha(page, fid)
+            ext, ler = "xlsx", linhas_da_planilha
+        else:
+            corpo = self._baixar_drive(page, fid)
+            ext, ler = ("xlsx", linhas_da_planilha) if tipo == "xlsx" else ("pdf", linhas_do_pdf)
         if not corpo:
             return None
-        linhas = linhas_do_pdf(corpo)
+        if ext == "pdf" and not corpo.startswith(b"%PDF"):
+            return None
+        linhas = ler(corpo)
         if not any(c[0] != "#DATA" for *_x, c in linhas):
             return None
-        return corpo, "pdf", linhas
+        return corpo, ext, linhas
 
     def normalizar(self, linhas, data):
         data_pdf, out = None, []
@@ -256,7 +294,7 @@ class ColetorRS(ColetorBA):
                 data_pdf = parse_data(cel[1])
                 continue
             secao, prod, und, mx, com, mn = (cel + [""] * 6)[:6]
-            if _norm(secao).startswith(SECOES_FORA) or not prod:
+            if any(x in _norm(secao) for x in SECOES_FORA) or not prod:
                 continue
             mx, com, mn = numero_rs(mx), numero_rs(com), numero_rs(mn)
             if com in ("", "0,00"):   # 0,00 = produto sem oferta no dia
@@ -342,4 +380,79 @@ def linhas_do_pdf(dados):
                 prod = " ".join(w["text"] for w in r if w["x1"] <= xu + 10)
                 und = " ".join(w["text"] for w in r if w["x1"] > xu + 10 and w["x0"] < xp and w["text"] != "R$")
                 out.append((npag, len(out), "pdf", [secao, prod, und, precos[0], precos[1], precos[2]]))
+    return out
+
+
+def tipo_arquivo(nome, href=""):
+    """Tipo do item da pasta do Drive pelo link (visão embutida) ou, sem link, pelo nome."""
+    h, n = href or "", nome.lower()
+    if "/folders/" in h:
+        return "pasta"
+    if "docs.google.com/spreadsheets" in h:
+        return "planilha"
+    if n.endswith(".pdf"):
+        return "pdf"
+    if n.endswith((".xlsx", ".xls")):
+        return "xlsx"
+    if not h:   # página normal da pasta (sem link): "02/2026 Fevereiro" = pasta; "Cotação 09/02/2026" = planilha
+        if re.fullmatch(r"\d{1,2}\s*/\s*\d{4}.*", nome.strip()):
+            return "pasta"
+        if data_do_nome(nome) and "." not in nome[-5:]:
+            return "planilha"
+    return ""
+
+
+def data_do_nome(nome):
+    """'Cotacao 16/11/2026.pdf' / 'Cotação 31-01-2025' / 'Cotacao_29_07_2026.pdf' -> date."""
+    m = re.search(r"(\d{1,2})[/_.\-](\d{1,2})[/_.\-](\d{4}|\d{2})(?!\d)", nome)
+    if not m:
+        return None
+    try:
+        return dt.date(int(m.group(3)) + (2000 if len(m.group(3)) == 2 else 0), int(m.group(2)), int(m.group(1)))
+    except ValueError:
+        return None
+
+
+def _celula(v):
+    if v is None:
+        return ""
+    if isinstance(v, (int, float)):
+        return f"{v:.2f}"
+    return re.sub(r"\s+", " ", str(v)).strip()
+
+
+def linhas_da_planilha(dados):
+    """.xlsx (planilha da CEASA-RS) -> mesmas linhas de linhas_do_pdf().
+    Colunas achadas pelo cabeçalho (UND | MAX | MAIS FREQUENTE | MÍNIMO); o produto é a coluna antes de UND.
+    Linha só com texto (célula mesclada) = título de seção."""
+    import openpyxl
+
+    wb = openpyxl.load_workbook(io.BytesIO(dados), read_only=True, data_only=True)
+    ws = next((w for w in wb.worksheets if "COTA" in _norm(w.title)), wb.worksheets[0])
+    out = [(1, 0, "planilha", ["#DATA", "", ws.title.strip()])]
+    secao, col = "", None
+    for linha in ws.iter_rows(values_only=True):
+        cel = [_celula(v) for v in linha]
+        nc = [_norm(c) for c in cel]
+        if "UND" in nc and "MAX" in nc:   # cabeçalho (repete a cada seção)
+            iu = nc.index("UND")
+            col = (max(iu - 1, 0), iu, nc.index("MAX"),
+                   next(i for i, c in enumerate(nc) if "FREQ" in c),
+                   next(i for i, c in enumerate(nc) if c.startswith("MIN")))
+            continue
+        cheias = [c for c in cel if c]
+        if not cheias:
+            continue
+        if col is None or not any(PRECO.match(numero_rs(cel[i]).replace(",", ".") or "x")
+                                  for i in col[2:] if i < len(cel)):
+            if col is None or len(cel) <= col[1] or not cel[col[1]]:
+                if len(set(cheias)) == 1 and not PRECO.match(cheias[0].replace("R$", "").strip()):
+                    secao = cheias[0]   # 'VERDURAS E LEGUMES', 'FRUTAS', 'CENTRAL DAS FLORES'...
+            continue
+        cel += [""] * (max(col) + 1 - len(cel))
+        ip, iu, imx, ifr, imn = col
+        if not cel[ip]:
+            continue
+        out.append((1, len(out), "planilha", [secao, cel[ip], cel[iu], cel[imx], cel[ifr], cel[imn]]))
+    wb.close()
     return out
