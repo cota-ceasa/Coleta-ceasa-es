@@ -63,7 +63,7 @@ const Auth = (() => {
 
     function topo(titulo, sub) {
         return `<div class="flex items-center justify-between px-4 h-14 border-b border-mata-800 bg-mata-900 sticky top-0">
-                    <span class="font-black text-verde-claro">COTA CEA<span class="text-ouro">$</span>A</span>
+                    <span class="font-black text-verde-claro">COTA CEA<span class="text-ouro logo-cifrao">$</span>A</span>
                     <button onclick="fecharFolha()" aria-label="Fechar" class="text-slate-400 hover:text-white p-2"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
                 <div class="px-5 py-6"><h2 class="text-2xl font-bold text-white leading-tight">${titulo}</h2><p class="text-slate-400 mt-1 mb-5">${sub}</p>`;
