@@ -190,6 +190,10 @@ function renderAnual() {
         <div class="${box} sempre-escuro">
             ${Graf.anual(A, ANUAL.ocultos)}
             <p class="text-xs text-slate-500 mt-2">Médias semanais do preço comum. Toque nos anos para mostrar ou esconder. Pontilhado: previsão; faixa: menor e maior caso dos anos anteriores. ${A.proj.some(p => p.w > 51) ? 'Meses em amarelo: começo do ano seguinte.' : ''}</p>
+            <div class="mt-3 flex items-start gap-2 rounded-xl border border-ouro/40 bg-ouro/10 px-3 py-2.5 text-xs text-slate-200 leading-snug" role="note">
+                <i class="fa-solid fa-triangle-exclamation text-ouro mt-0.5"></i>
+                <p>A previsão de preços considera somente o padrão de variação dos anos anteriores, sem nenhuma garantia de acerto pleno. Cota CEA$A não se responsabiliza pelo uso dessa previsão.</p>
+            </div>
         </div>
 
         <div class="${box}">
