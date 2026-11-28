@@ -417,7 +417,7 @@ function renderDetalhe() {
             </table>
         </div>
         <button data-act="anual" class="w-full bg-ouro hover:brightness-95 text-black font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 shadow-sm transition"><i class="fa-solid fa-chart-line"></i>Análise anualizada e previsão de preços</button>
-        ${pracasDoItem(it).length > 1 ? `<button data-act="comp" class="w-full bg-mata-900 border border-mata-700 hover:bg-mata-800 text-white font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 transition-colors"><i class="fa-solid fa-scale-balanced text-verde-claro"></i>Comparar praças no histórico</button>` : ''}`;
+        <button data-act="comp" class="w-full bg-mata-900 border border-mata-700 hover:bg-mata-800 text-white font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 transition-colors"><i class="fa-solid fa-scale-balanced text-verde-claro"></i>Comparar praças no histórico</button>`;
     window.scrollTo(0, y);
 }
 
@@ -488,7 +488,7 @@ function renderDetalheMulti() {
             </table>
         </div>
         <button data-act="anual" class="w-full bg-ouro hover:brightness-95 text-black font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 shadow-sm transition"><i class="fa-solid fa-chart-line"></i>Análise anualizada e previsão de preços</button>
-        ${pracasDoItem(it).length > 1 ? `<button data-act="comp" class="w-full bg-mata-900 border border-mata-700 hover:bg-mata-800 text-white font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 transition-colors"><i class="fa-solid fa-scale-balanced text-verde-claro"></i>Comparar praças no histórico</button>` : ''}`;
+        <button data-act="comp" class="w-full bg-mata-900 border border-mata-700 hover:bg-mata-800 text-white font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 transition-colors"><i class="fa-solid fa-scale-balanced text-verde-claro"></i>Comparar praças no histórico</button>`;
     window.scrollTo(0, y);
 }
 
@@ -566,6 +566,7 @@ document.addEventListener('click', (e) => {
         case 'comp': abrirComparar(); break;
         case 'comp-merc': alternarPracaComp(arg); break;
         case 'comp-per': periodoComp(arg); break;
+        case 'comp-sim': compararSemelhantes(); break;
         case 'anual-merc': det.anual.mid = arg; ANUAL.zoom = null; renderAnual(); break;
         case 'anual-ano': alternarAnoAnual(arg); break;
         case 'mais': abrirFolha(`
