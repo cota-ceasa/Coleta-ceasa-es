@@ -25,6 +25,10 @@ on:
         description: "Coletar a partir desta data (AAAA-MM-DD). Vazio = últimos 30 dias"
         required: false
         default: ""
+      ceasas:
+        description: "Só estas praças, separadas por espaço (ex.: RS ou SP CWB). Vazio = todas"
+        required: false
+        default: ""
       max:
         description: "Máximo de boletins novos POR CEASA nesta execução (são 9 praças: use 40 ao carregar histórico)"
         required: false
@@ -107,11 +111,13 @@ jobs:
           MAXIMO: ${{ inputs.max }}
           RENORMALIZAR: ${{ inputs.renormalizar }}
           PERFIL: ${{ inputs.perfil }}
+          CEASAS: ${{ inputs.ceasas }}
         run: |
           # RJ bloqueia os IPs do GitHub: roda no seu computador (coleta-local.yml)
           ARGS="--onde nuvem --max ${MAXIMO:-40} --perfil ${PERFIL:-computador}"
           if [ -n "$INICIO" ]; then ARGS="$ARGS --inicio $INICIO"; fi
           if [ "$RENORMALIZAR" = "true" ]; then ARGS="$ARGS --renormalizar"; fi
+          if [ -n "$CEASAS" ]; then ARGS="$ARGS --ceasa $CEASAS"; fi
           python -m coleta.run $ARGS
 
       - name: Guardar boletins brutos e diagnósticos
