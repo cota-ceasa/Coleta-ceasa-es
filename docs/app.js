@@ -11,7 +11,7 @@ const PERIODOS = [
 ];
 const periodosDe = ids => PERIODOS.filter(p => !p.so || ids.every(id => id === p.so));
 // cor de cada praça nos gráficos de comparação (boa leitura no fundo claro e no escuro)
-const CORES = ['#22c55e', '#3b82f6', '#f97316', '#ec4899', '#a855f7', '#14b8a6', '#eab308', '#ef4444'];
+const CORES = ['#22c55e', '#3b82f6', '#f97316', '#ec4899', '#a855f7', '#14b8a6', '#FFDF00', '#ef4444'];
 const corMercado = id => CORES[Math.max(0, dados.mercados.findIndex(m => m.id === id)) % CORES.length];
 const nomeCurto = m => m.nome.replace(/^CEASA\s*-\s*/i, '');
 const cidade = id => nomeCurto(mercadoPor(id)).replace(/\s*\([^)]*\)\s*$/, '');   // 'Vitória (ES)' -> 'Vitória'
@@ -73,7 +73,7 @@ function montarMercados() {
         <p class="px-3 pt-2 pb-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Locais (marque um ou mais)</p>
         ${dados.mercados.map(m => `
         <label class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-mata-800 cursor-pointer text-sm text-slate-200">
-            <input type="checkbox" value="${esc(m.id)}" onchange="marcarMercado(this)" class="w-4 h-4 accent-[#F0F02A] shrink-0">
+            <input type="checkbox" value="${esc(m.id)}" onchange="marcarMercado(this)" class="w-4 h-4 accent-[#FFDF00] shrink-0">
             <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${corMercado(m.id)}"></span>
             <span class="truncate">${esc(m.nome)}</span>
         </label>`).join('')}
@@ -356,7 +356,7 @@ function botoesPracas(it) {
 function botoesPeriodo(pers, per) {
     return `<div class="flex flex-wrap gap-1.5" role="group" aria-label="Período do gráfico">
             ${pers.map(p => `<button data-act="per" data-arg="${p.dias}" aria-pressed="${p === per}" class="flex-none px-2.5 py-1.5 rounded-full text-xs font-semibold border whitespace-nowrap transition-colors ${p === per ? 'bg-ouro text-mata-950 border-ouro' : 'bg-mata-900 text-slate-300 border-mata-700 hover:border-verde/60'}">${p.rot}</button>`).join('')}
-            <button data-act="mais" class="flex-none px-2.5 py-1.5 rounded-full text-xs font-semibold border border-ouro/60 text-ouro whitespace-nowrap hover:bg-ouro/10 transition-colors"><i class="fa-solid fa-lock mr-1 text-[10px]"></i>Mais dados sob consulta</button>
+            <button data-act="mais" class="flex-none px-2.5 py-1.5 rounded-full text-xs font-semibold botao-ouro whitespace-nowrap transition-colors"><i class="fa-solid fa-lock mr-1 text-[10px]"></i>Mais dados sob consulta</button>
         </div>`;
 }
 
@@ -566,7 +566,7 @@ document.addEventListener('click', (e) => {
                 <div class="bg-mata-900 border border-ouro/40 rounded-2xl p-6">
                     <i class="fa-solid fa-chart-line text-ouro text-3xl mb-3"></i>
                     <h3 class="text-xl font-bold text-white mb-2">Mais dados sob consulta</h3>
-                    <p class="text-slate-300 leading-relaxed">Para mais dados e análises, entre em contato pelo email <a href="mailto:cota.ceasa@gmail.com" class="text-ouro font-semibold underline break-all">cota.ceasa@gmail.com</a></p>
+                    <p class="text-slate-300 leading-relaxed">Para mais dados e análises, entre em contato pelo email <a href="mailto:cota.ceasa@gmail.com" class="botao-ouro font-semibold break-all">cota.ceasa@gmail.com</a></p>
                     <button onclick="fecharFolha()" class="mt-5 w-full bg-ouro text-mata-950 font-bold py-3 rounded-xl">Fechar</button>
                 </div>
             </div>`); break;

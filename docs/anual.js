@@ -9,7 +9,7 @@ const ANUAL = {
     ANOS: 6,          // atual + 5 anteriores
     HORIZ: 12,        // semanas de previsão
     // escala do verde (ano atual, linha mais grossa) ao amarelo (ano mais antigo, mais fina)
-    // escala do ano atual ao mais antigo: azul -> verde -> amarelo marca-texto (#FCFC30)
+    // escala do ano atual ao mais antigo: azul -> verde -> amarelo marca-texto (#FFDF00)
     ESCALA_HSL: [[212, 90, 56], [138, 77, 40], [60, 97, 59]],
     ocultos: new Set(),
 };
