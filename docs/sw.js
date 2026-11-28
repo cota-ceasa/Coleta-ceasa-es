@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cotacao-campo-v50';
+const CACHE_NAME = 'cotacao-campo-v51';
 
 // Arquivos do próprio app (mesma origem): falha em qualquer um cancela a instalação
 const LOCAL = [
@@ -8,6 +8,7 @@ const LOCAL = [
   './grafico.js',
   './auth.js',
   './anual.js',
+  './comparar.js',
   './app.js',
   './manifest.json',
   './dados.json',

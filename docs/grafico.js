@@ -73,6 +73,7 @@ const Graf = {
     // ---------- Histórico com zoom (envolve desenhar() e multi()) ----------
     // tipo 'um': dados = [{d, v}];  tipo 'multi': dados = [{id, cor, pts}]
     zoomH: null,                       // {i0, i1} em posições da lista de datas, ou null
+    fmtCurta: null, fmtLonga: null,    // rótulos de data do gráfico de praças (a comparação usa mês/semana)
     historico(tipo, dados) {
         const D = tipo === 'um' ? dados.map(p => p.d) : [...new Set(dados.flatMap(s => s.pts.map(p => p.d)))].sort();
         this.hist = { tipo, dados, D };
@@ -186,19 +187,19 @@ const Graf = {
         const marcas = n > 3 ? [0, Math.round((n - 1) / 3), Math.round((n - 1) * 2 / 3), n - 1] : [...Array(n).keys()];
         marcas.forEach((i, j) => {
             const anc = j === 0 ? 'start' : j === marcas.length - 1 ? 'end' : 'middle';
-            o += `<text x="${x(i).toFixed(1)}" y="${H - 7}" font-size="12" text-anchor="${anc}" fill="#94a3b8">${dataCurta(datas[i])}</text>`;
+            o += `<text x="${x(i).toFixed(1)}" y="${H - 7}" font-size="12" text-anchor="${anc}" fill="#94a3b8">${(this.fmtCurta || dataCurta)(datas[i])}</text>`;
         });
         return o + '</svg>';
     },
 
     infoM(i) {
         const c = this.estM, d = c.datas[i];
-        return `<div class="text-sm text-slate-400 mb-1">${dataBR(d, true)}</div><div class="flex flex-wrap gap-x-4 gap-y-1">` +
+        return `<div class="text-sm text-slate-400 mb-1">${this.fmtLonga ? this.fmtLonga(d) : dataBR(d, true)}</div><div class="flex flex-wrap gap-x-4 gap-y-1">` +
             c.series.map((s) => {
                 // último preço da praça até este dia (nem toda praça tem boletim todo dia)
                 let p = null;
                 for (const q of s.pts) { if (q.d <= d) p = q; else break; }
-                const dia = p && p.d !== d ? `<span class="text-[11px] text-slate-500">(${dataCurta(p.d)})</span>` : '';
+                const dia = p && p.d !== d ? `<span class="text-[11px] text-slate-500">(${(this.fmtCurta || dataCurta)(p.d)})</span>` : '';
                 return `<span class="inline-flex items-center gap-1.5 text-[15px]"><span class="w-2.5 h-2.5 rounded-full" style="background:${s.cor}"></span><span class="text-slate-400 text-xs font-semibold">${esc(s.id)}</span><b class="text-white">${p ? R$(p.v) : '—'}</b>${dia}</span>`;
             }).join('') + '</div>';
     },
