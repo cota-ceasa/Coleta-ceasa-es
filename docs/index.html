@@ -49,9 +49,6 @@
         /* amarelo sobre fundo claro: texto e ícones ganham contorno de 1px mais escuro */
         html.claro .text-ouro, html.claro .text-ouro\/70, html.claro .text-ouro\/90, html.claro .hover\:text-ouro:hover {
             color: #FFDF00; text-shadow: -1px 0 #9A7D00, 1px 0 #9A7D00, 0 -1px #9A7D00, 0 1px #9A7D00; }
-        html.claro .text-ouro svg, html.claro .text-ouro\/70 svg, html.claro .text-ouro\/90 svg,
-        html.claro svg [fill="#FFDF00" i], html.claro svg [stroke="#FFDF00" i] {
-            filter: drop-shadow(1px 0 0 #9A7D00) drop-shadow(-1px 0 0 #9A7D00) drop-shadow(0 1px 0 #9A7D00) drop-shadow(0 -1px 0 #9A7D00); }
         html.claro .bg-ouro\/10 { background-color: rgba(255, 223, 0, .14); }
         html.claro .hover\:bg-ouro\/10:hover, html.claro .hover\:bg-ouro\/20:hover { background-color: rgba(255, 223, 0, .3); }
         html.claro .border-ouro\/30, html.claro .border-ouro\/40, html.claro .border-ouro\/60 { border-color: #9A7D00; }
@@ -79,19 +76,14 @@
         html.claro .sempre-escuro svg [fill="#94a3b8"] { fill: #94a3b8; }
         html.claro .sempre-escuro .hover\:bg-mata-800:hover { background-color: #12301e; }
         html.claro .sempre-escuro .text-ouro, html.claro .sempre-escuro .text-ouro\/70, html.claro .sempre-escuro .text-ouro\/90 { text-shadow: none; }
-        html.claro .sempre-escuro svg, html.claro .sempre-escuro svg [fill="#FFDF00" i], html.claro .sempre-escuro svg [stroke="#FFDF00" i] { filter: none; }
-        /* símbolos vazados (estrela sem favorito, ícones fa-regular): só o contorno de fora; por dentro, a cor do fundo */
-        html.claro .text-ouro svg[fill="none"], html.claro .text-ouro\/70 svg[fill="none"], html.claro .text-ouro\/90 svg[fill="none"] { fill: #ffffff; }
-        html.claro #btn-fav-header svg[fill="none"] { fill: #edf3ef; }
-        html.claro #btn-fav-header:hover svg[fill="none"] { fill: #e1ebe4; }
+        /* estrelas, gráficos e ícones vazados: sem contorno */
         html.claro .text-ouro .fa-regular, html.claro .fa-regular.text-ouro, html.claro .text-ouro\/90 .fa-regular { text-shadow: none; }
         /* logo (ícone e o "$" do nome): sem contorno */
-        html.claro svg.logo, html.claro svg.logo * { filter: none; }
         html.claro .logo-cifrao { text-shadow: none; }
         /* ícones de apoio dos campos (setas, lupa, calendário): no claro, verde escuro do app em vez de amarelo */
         html.claro .ico-campo { color: #0B8A3B !important; text-shadow: none !important; }
         /* link em amarelo = botão amarelo com texto preto (padrão do app, nos dois temas) */
-        .botao-ouro { background-color: #FFDF00 !important; color: #000 !important; border: 1px solid #E6C700 !important;
+        .botao-ouro { background-color: #FFDF00 !important; color: #000 !important; border: 1px solid transparent !important;
             text-decoration: none !important; text-shadow: none !important; }
         .botao-ouro:hover { background-color: #E6C700 !important; }
         a.botao-ouro { display: inline-block; padding: .05rem .5rem; border-radius: .5rem; }
