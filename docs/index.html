@@ -80,6 +80,14 @@
         html.claro .sempre-escuro .hover\:bg-mata-800:hover { background-color: #12301e; }
         html.claro .sempre-escuro .text-ouro, html.claro .sempre-escuro .text-ouro\/70, html.claro .sempre-escuro .text-ouro\/90 { text-shadow: none; }
         html.claro .sempre-escuro svg, html.claro .sempre-escuro svg [fill="#FFDF00" i], html.claro .sempre-escuro svg [stroke="#FFDF00" i] { filter: none; }
+        /* símbolos vazados (estrela sem favorito, ícones fa-regular): só o contorno de fora; por dentro, a cor do fundo */
+        html.claro .text-ouro svg[fill="none"], html.claro .text-ouro\/70 svg[fill="none"], html.claro .text-ouro\/90 svg[fill="none"] { fill: #ffffff; }
+        html.claro #btn-fav-header svg[fill="none"] { fill: #edf3ef; }
+        html.claro #btn-fav-header:hover svg[fill="none"] { fill: #e1ebe4; }
+        html.claro .text-ouro .fa-regular, html.claro .fa-regular.text-ouro, html.claro .text-ouro\/90 .fa-regular { text-shadow: none; }
+        /* logo (ícone e o "$" do nome): sem contorno */
+        html.claro svg.logo, html.claro svg.logo * { filter: none; }
+        html.claro .logo-cifrao { text-shadow: none; }
         /* ícones de apoio dos campos (setas, lupa, calendário): no claro, verde escuro do app em vez de amarelo */
         html.claro .ico-campo { color: #0B8A3B !important; text-shadow: none !important; }
         /* link em amarelo = botão amarelo com texto preto (padrão do app, nos dois temas) */
@@ -100,13 +108,13 @@
         <div class="px-4 h-16 flex items-center justify-between">
             <!-- Logo: losango + círculo da bandeira, com o cifrão como marca -->
             <div class="flex items-center space-x-2.5 min-w-0">
-                <svg viewBox="0 0 48 48" class="w-10 h-10 shrink-0" role="img" aria-label="Logo COTA CEA$A">
+                <svg viewBox="0 0 48 48" class="logo w-10 h-10 shrink-0" role="img" aria-label="Logo COTA CEA$A">
                     <rect width="48" height="48" rx="12" fill="#FFDF00"/>
                     <path d="M9 33 L18 23 L25 29 L37 14" fill="none" stroke="#0B8A3B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
                     <path d="M28 13.5 H37.5 V23" fill="none" stroke="#0B8A3B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
                 <div class="min-w-0">
-                    <h1 class="text-[24px] font-black tracking-tight leading-none text-verde-claro whitespace-nowrap">COTA CEA<span class="text-ouro">$</span>A</h1>
+                    <h1 class="text-[24px] font-black tracking-tight leading-none text-verde-claro whitespace-nowrap">COTA CEA<span class="text-ouro logo-cifrao">$</span>A</h1>
                 </div>
             </div>
 
@@ -193,7 +201,7 @@
     </div>
 
     <footer class="bg-mata-900 border-t border-mata-800 py-5 px-4 text-center text-xs text-slate-500">
-        <p>2026 COTA CEA<span class="text-ouro">$</span>A</p>
+        <p>2026 COTA CEA<span class="text-ouro logo-cifrao">$</span>A</p>
     </footer>
 
     <!-- Banner de patrocínio: fixo na parte inferior da tela -->
