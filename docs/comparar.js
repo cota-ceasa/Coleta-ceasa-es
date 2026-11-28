@@ -1,19 +1,13 @@
 /* COTA CEA$A — Comparação histórica entre praças (até 5)
  * Abre a partir do detalhe de um produto. Uma linha por praça com o preço comum ao longo do tempo:
- * média semanal (período de até 1 ano) ou mensal (períodos maiores), para as linhas ficarem legíveis.
+ * preço diário (1 e 3 meses) ou média semanal (1 ano). Mesmos períodos do detalhe (até 1 ano);
+ * mais que isso, só sob consulta.
  * Abaixo, um quadro por praça com média, menor, maior e última cotação do período.
  */
 const COMP = {
     MAX: 5,
-    PERIODOS: [
-        { rot: '1 ano', dias: 365 },
-        { rot: '2 anos', dias: 730 },
-        { rot: '5 anos', dias: 1826 },
-        { rot: 'Tudo', dias: 0 }
-    ]
+    get PERIODOS() { return PERIODOS; }   // os mesmos do detalhe do produto (app.js): 1 mês, 3 meses, 1 ano
 };
-const MES_ABR = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-const MES_NOME = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
 const pracasDoItem = (it) => dados.mercados.map(m => m.id).filter(id => it.m[id]);
 
@@ -39,7 +33,7 @@ function abrirComparar() {
     const it = itemPorChave(det.key), todas = pracasDoItem(it);
     let ids = det.mercs.filter(id => todas.includes(id)).slice(0, COMP.MAX);
     if (ids.length < 2) ids = [...new Set([...ids, ...todas])].slice(0, COMP.MAX);
-    det.comp = { ids, dias: 365, aviso: '' };
+    det.comp = { ids, dias: (PERIODOS.find(p => p.dias === periodoDias) || PERIODOS[0]).dias, aviso: '' };
     Graf.zoomH = null;
     history.pushState({ det: det.key, comp: true }, '');
     renderComparar();
@@ -79,15 +73,15 @@ function renderComparar() {
     const y = window.scrollY;
     const c = det.comp, it = itemPorChave(det.key), todas = pracasDoItem(it);
     const fim = c.ids.map(id => { const p = serie(it, id); return p[p.length - 1].d; }).sort().pop();
-    const ini = c.dias ? somarDias(fim, -c.dias) : '0000-00-00';
-    const porMes = !c.dias || c.dias > 365;
+    const ini = somarDias(fim, -c.dias);
+    const semanal = c.dias > 91;   // 1 ano: média semanal; 1 e 3 meses: cada cotação
     const series = c.ids.map(id => {
         const bruto = serie(it, id).filter(p => p.d >= ini);
-        return { id, cor: corMercado(id), bruto, pts: agregarComp(bruto, porMes) };
+        return { id, cor: corMercado(id), bruto, pts: semanal ? agregarComp(bruto, false) : bruto };
     }).filter(s => s.pts.length);
-    // rótulos do gráfico: mês/ano (médias mensais) ou "semana de dd/mm/aaaa"
-    Graf.fmtCurta = porMes ? (d => `${MES_ABR[+d.slice(5, 7) - 1]}/${d.slice(2, 4)}`) : null;
-    Graf.fmtLonga = porMes ? (d => `Média de ${MES_NOME[+d.slice(5, 7) - 1]} de ${d.slice(0, 4)}`) : (d => `Semana de ${dataBR(d)}`);
+    // rótulo do dia no gráfico: "Semana de dd/mm/aaaa" na média semanal; data normal nos demais
+    Graf.fmtCurta = null;
+    Graf.fmtLonga = semanal ? (d => `Semana de ${dataBR(d)}`) : null;
 
     const detalhe = it.d.replace(/\bLonga Vida\b/g, 'LV');
     const sub = [UNIDADE[it.u], it.e !== 'kg' ? it.e : ''].filter(Boolean).join(' · ');
@@ -97,7 +91,7 @@ function renderComparar() {
         return { id: s.id, cor: s.cor, md: v.reduce((a, b) => a + b, 0) / v.length, mn: Math.min(...v), mx: Math.max(...v), n: v.length, u };
     });
     const maisBarata = est.length > 1 ? est.reduce((a, b) => (b.md < a.md ? b : a)) : null;
-    const per = COMP.PERIODOS.find(p => p.dias === c.dias) || COMP.PERIODOS[0];
+    const per = COMP.PERIODOS.find(p => p.dias === c.dias) || COMP.PERIODOS[COMP.PERIODOS.length - 1];
 
     el('vista-detalhe').innerHTML = `
         <div class="flex items-center justify-between">
@@ -122,11 +116,12 @@ function renderComparar() {
 
         <div class="flex flex-wrap gap-1.5" role="group" aria-label="Período da comparação">
             ${COMP.PERIODOS.map(p => `<button data-act="comp-per" data-arg="${p.dias}" aria-pressed="${p === per}" class="flex-none px-3 py-1.5 rounded-full text-xs font-semibold border whitespace-nowrap transition-colors ${p === per ? 'bg-ouro text-mata-950 border-ouro' : 'bg-mata-900 text-slate-300 border-mata-700 hover:border-verde/60'}">${p.rot}</button>`).join('')}
+            <button data-act="mais" class="flex-none px-2.5 py-1.5 rounded-full text-xs font-semibold botao-ouro whitespace-nowrap transition-colors"><i class="fa-solid fa-lock mr-1 text-[10px]"></i>Mais dados sob consulta</button>
         </div>
 
         <div class="${box}">
             ${series.length ? Graf.historico('multi', series.map(({ id, cor, pts }) => ({ id, cor, pts }))) : '<p class="text-sm text-slate-400">Sem cotações neste período.</p>'}
-            <p class="text-xs text-slate-500 mt-1">${porMes ? 'Média mensal' : 'Média semanal'} do preço comum de cada praça. Passe o cursor ou deslize o dedo no gráfico para ver os valores.</p>
+            <p class="text-xs text-slate-500 mt-1">${semanal ? 'Média semanal do preço comum' : 'Preço comum'} de cada praça. Passe o cursor ou deslize o dedo no gráfico para ver os valores.</p>
         </div>
 
         <div class="${box}">
