@@ -80,6 +80,8 @@
         html.claro .sempre-escuro .hover\:bg-mata-800:hover { background-color: #12301e; }
         html.claro .sempre-escuro .text-ouro, html.claro .sempre-escuro .text-ouro\/70, html.claro .sempre-escuro .text-ouro\/90 { text-shadow: none; }
         html.claro .sempre-escuro svg, html.claro .sempre-escuro svg [fill="#FFDF00" i], html.claro .sempre-escuro svg [stroke="#FFDF00" i] { filter: none; }
+        /* ícones de apoio dos campos (setas, lupa, calendário): no claro, verde escuro do app em vez de amarelo */
+        html.claro .ico-campo { color: #0B8A3B !important; text-shadow: none !important; }
         /* link em amarelo = botão amarelo com texto preto (padrão do app, nos dois temas) */
         .botao-ouro { background-color: #FFDF00 !important; color: #000 !important; border: 1px solid #E6C700 !important;
             text-decoration: none !important; text-shadow: none !important; }
@@ -147,7 +149,7 @@
                         <option value="pescados">🐟 Pescados</option>
                         <option value="outros">🧺 Outros</option>
                     </select>
-                    <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-ouro text-xs pointer-events-none"></i>
+                    <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-ouro ico-campo text-xs pointer-events-none"></i>
                 </div>
 
                 <!-- Local: várias praças podem ser marcadas para comparar -->
@@ -155,20 +157,20 @@
                     <button id="btn-mercado" type="button" onclick="abrirMercados(event)" aria-haspopup="true" aria-label="Locais" class="w-full text-left bg-mata-800 text-slate-200 text-sm font-medium rounded-xl border border-mata-700 pl-3.5 pr-9 py-2.5 focus:ring-2 focus:ring-ouro focus:outline-none cursor-pointer">
                         <span id="btn-mercado-rot" class="block truncate">📍 Local</span>
                     </button>
-                    <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-ouro text-xs pointer-events-none"></i>
+                    <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-ouro ico-campo text-xs pointer-events-none"></i>
                     <div id="pop-mercados" class="hidden absolute right-0 top-full mt-1.5 w-72 max-w-[calc(100vw-2rem)] z-40 bg-mata-900 border border-mata-700 rounded-xl shadow-xl shadow-black/40 p-1.5"></div>
                 </div>
             </div>
 
             <div class="relative flex-1">
-                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-ouro text-sm"></i>
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-ouro ico-campo text-sm"></i>
                 <input type="search" id="input-busca" oninput="filtrarProdutos()" placeholder="Buscar por produto (ex: Tomate, Batata...)" autocomplete="off" class="w-full bg-mata-950 border border-mata-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-ouro">
             </div>
         </div>
 
         <!-- Faixa de informação: data do boletim, contagem e filtro de favoritos -->
         <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 px-1">
-            <span id="info-boletim"><i class="fa-regular fa-calendar mr-1 text-ouro"></i>Carregando cotações…</span>
+            <span id="info-boletim"><i class="fa-regular fa-calendar mr-1 text-ouro ico-campo"></i>Carregando cotações…</span>
             <div class="flex items-center gap-3">
                 <button id="chip-fav" onclick="limparFiltros()" class="hidden items-center gap-1.5 botao-ouro rounded-full px-2.5 py-1 font-semibold transition-colors">
                     <i class="fa-solid fa-star"></i> Só favoritos <i class="fa-solid fa-xmark ml-0.5"></i>
