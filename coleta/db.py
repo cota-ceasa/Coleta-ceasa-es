@@ -58,11 +58,33 @@ def _data(v):
     return v if isinstance(v, dt.date) else dt.date.fromisoformat(str(v)[:10])
 
 
+def _conectar_pg(url):
+    """Conecta no Postgres. Se a rede do runner não alcançar o endereço IPv6 do servidor
+    ('Network is unreachable'), tenta de novo forçando IPv4 (hostaddr), mantendo o nome do host
+    para o TLS/SNI."""
+    import socket
+    from urllib.parse import urlparse
+
+    import psycopg  # instalado via requirements.txt
+
+    try:
+        return psycopg.connect(url)
+    except psycopg.OperationalError as e:
+        host = urlparse(url).hostname
+        try:
+            ipv4 = sorted({a[4][0] for a in socket.getaddrinfo(host, None, socket.AF_INET)}) if host else []
+        except socket.gaierror:
+            ipv4 = []
+        if not ipv4:
+            raise
+        print(f"[db] conexão falhou ({str(e).splitlines()[0][:120]}); tentando por IPv4 {ipv4[0]}")
+        return psycopg.connect(url, hostaddr=ipv4[0])
+
+
 def conectar():
     url = os.environ.get("DATABASE_URL", "").strip()
     if url:
-        import psycopg  # instalado via requirements.txt
-        conn = Conexao(psycopg.connect(url), True)
+        conn = Conexao(_conectar_pg(url), True)
     else:
         import sqlite3
         print(f"[db] DATABASE_URL não definida: usando o arquivo local {SQLITE_ARQ}")
