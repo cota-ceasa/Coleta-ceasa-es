@@ -5,8 +5,9 @@ from .pr import COLETORES_PR
 from .prohort import InspecaoProhort
 from .rj import ColetorRJ
 from .rs import ColetorRS
+from .sc import ColetorSC
 from .sp import ColetorSP
 
-REGISTRO = {c.id: c for c in (ColetorES(), ColetorBA(), ColetorRJ(), ColetorSP(), ColetorRS(), *COLETORES_PR)}
+REGISTRO = {c.id: c for c in (ColetorES(), ColetorBA(), ColetorRJ(), ColetorSP(), ColetorRS(), ColetorSC(), *COLETORES_PR)}
 # só para --discover (ainda não coletam)
 INSPECAO = {c.id: c for c in (InspecaoProhort(),)}
