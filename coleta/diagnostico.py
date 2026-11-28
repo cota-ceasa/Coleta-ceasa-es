@@ -16,6 +16,8 @@ ALVOS = [
     ("ES formulário (controle)", "http://200.198.51.71/detec/filtro_boletim_es/filtro_boletim_es.php"),
     ("BA boletins (SDE)", "https://www.ba.gov.br/sde/boletim-informativo-ceasa-periodo-eleitoral"),
     ("RJ cotação", "https://www.rj.gov.br/ceasa/Cota%C3%A7%C3%A3o"),
+    ("RS cotações", "https://www.ceasa.rs.gov.br/cotacoes-de-precos"),
+    ("RS pasta do Drive (nov/2026)", "https://drive.google.com/embeddedfolderview?id=1dEPfz7Rxnf4mC8ysKhufxGDX5Tr2xTq-"),
 ]
 PERFIS = ["computador", "android"]
 
