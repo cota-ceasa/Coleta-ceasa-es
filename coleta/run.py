@@ -14,6 +14,7 @@ from pathlib import Path
 
 from . import db, juncao
 from .ceasas import INSPECAO, REGISTRO
+from . import cache_cotacoes
 from .exportar import exportar
 
 BRT = dt.timezone(dt.timedelta(hours=-3))  # Brasília (sem horário de verão)
@@ -219,13 +220,18 @@ def main():
             if aplicar:
                 juncao.desfazer_bloqueadas(conn)      # reverte junções marcadas como erradas (NAO_JUNTAR)
             juncao.padronizar_legado(conn, aplicar)   # nomes antigos fora do padrão -> padrão (une as séries)
-            juncao.detectar(conn, aplicar)            # troca de nome no boletim -> junta na série nova
+            df = cache_cotacoes.cotacoes(conn)        # cópia local + só os dias que mudaram no banco
+            if juncao.detectar(conn, aplicar, cache_cotacoes.linhas_juncao(df)) and aplicar:
+                df = None                             # junção mudou o banco: recarrega abaixo
         except Exception as e:  # noqa: BLE001
             falhas_juncao = e
+            df = None
             log(f"[junção] FALHOU, publicando mesmo assim: {e}")
         else:
             falhas_juncao = None
-        exportar(conn, a.json)
+        if df is None:
+            df = cache_cotacoes.cotacoes(conn)
+        exportar(conn, a.json, df)
     conn.close()
     if not a.sem_exportar and falhas_juncao:   # aviso amarelo no GitHub, sem impedir a publicação
         print(f"::warning::junção de séries falhou: {falhas_juncao}")

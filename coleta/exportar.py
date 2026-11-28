@@ -7,8 +7,10 @@ from .gerar_dados import gerar
 COLUNAS = ["Data", "Mercado", "Produto", "Detalhe", "Embalagem", "Min", "Com", "Max", "Sit", "Conferência"]
 
 
-def exportar(conn, saida):
-    df = pd.DataFrame(db.cotacoes_validadas(conn), columns=COLUNAS)
+def exportar(conn, saida, df=None):
+    """df: cotações já carregadas (cache_cotacoes); sem ele, lê tudo do banco."""
+    if df is None:
+        df = pd.DataFrame(db.cotacoes_validadas(conn), columns=COLUNAS)
     if df.empty:
         print("[exportar] nenhuma cotação validada no banco: dados.json não foi alterado.")
         return False

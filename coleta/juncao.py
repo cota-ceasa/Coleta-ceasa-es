@@ -122,10 +122,12 @@ def padronizar_legado(conn, aplicar=True):
     return trocas
 
 
-def detectar(conn, aplicar=True):
+def detectar(conn, aplicar=True, linhas=None):
+    """linhas: (ceasa, data, produto, detalhe, embalagem, comum) já carregadas (cópia local); sem elas, lê do banco."""
     conn.executar(SQL_TABELA)
-    linhas = conn.consultar("SELECT ceasa_id, data, produto, detalhe, embalagem, comum FROM cotacao "
-                            "WHERE conferencia = 'validado' ORDER BY ceasa_id, data")
+    if linhas is None:
+        linhas = conn.consultar("SELECT ceasa_id, data, produto, detalhe, embalagem, comum FROM cotacao "
+                                "WHERE conferencia = 'validado' ORDER BY ceasa_id, data")
     series, fim_mercado = {}, {}
     for ceasa, data, prod, det, emb, com in linhas:
         info = emb_info(emb)

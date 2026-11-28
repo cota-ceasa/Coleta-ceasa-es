@@ -99,6 +99,17 @@ jobs:
         if: ${{ inputs.discover != '' && !inputs.diagnostico }}
         run: python -m coleta.run --discover "${{ inputs.discover }}" --perfil "${{ inputs.perfil || 'computador' }}"
 
+      # Cópia local das cotações (coleta/cache_cotacoes.py): só os dias que mudaram vêm do banco,
+      # para não gastar a cota de transferência do Neon baixando o histórico inteiro a cada execução.
+      - name: Restaurar cópia local das cotações
+        if: ${{ inputs.discover == '' && !inputs.diagnostico }}
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: cache/cotacoes.pkl.gz
+          key: cotacoes-${{ github.run_id }}
+          restore-keys: cotacoes-
+
       - name: Coletar boletins
         if: ${{ inputs.discover == '' && !inputs.diagnostico }}
         env:
@@ -118,6 +129,14 @@ jobs:
           if [ "$RENORMALIZAR" = "true" ]; then ARGS="$ARGS --renormalizar"; fi
           if [ -n "$CEASAS" ]; then ARGS="$ARGS --ceasa $CEASAS"; fi
           python -m coleta.run $ARGS
+
+      - name: Guardar cópia local das cotações
+        if: ${{ always() && inputs.discover == '' && !inputs.diagnostico && hashFiles('cache/cotacoes.pkl.gz') != '' }}
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: cache/cotacoes.pkl.gz
+          key: cotacoes-${{ hashFiles('cache/cotacoes.pkl.gz') }}
 
       - name: Guardar boletins brutos e diagnósticos
         if: always()
