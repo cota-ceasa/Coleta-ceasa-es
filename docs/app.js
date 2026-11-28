@@ -68,15 +68,61 @@ function sincronizarUI() {
 // ---------- dados ----------
 // A lista de localidades vem do dados.json: cada CEASA coletada aparece sozinha
 // O filtro de local aceita várias praças (caixas de marcar) para comparar preços
+// Ordem da lista: região (IBGE) > estado (alfabético) > capital primeiro > demais cidades (alfabético)
+const REGIOES = [
+    ['Norte', ['AC', 'AM', 'AP', 'PA', 'RO', 'RR', 'TO']],
+    ['Nordeste', ['AL', 'BA', 'CE', 'MA', 'PB', 'PE', 'PI', 'RN', 'SE']],
+    ['Centro-Oeste', ['DF', 'GO', 'MS', 'MT']],
+    ['Sudeste', ['ES', 'MG', 'RJ', 'SP']],
+    ['Sul', ['PR', 'RS', 'SC']]
+];
+// capital de cada UF (e nomes pelos quais a CEASA da capital aparece)
+const CAPITAIS = {
+    AC: ['Rio Branco'], AL: ['Maceió'], AM: ['Manaus'], AP: ['Macapá'], BA: ['Salvador'], CE: ['Fortaleza'],
+    DF: ['Brasília'], ES: ['Vitória'], GO: ['Goiânia'], MA: ['São Luís'], MG: ['Belo Horizonte', 'Grande BH'],
+    MS: ['Campo Grande'], MT: ['Cuiabá'], PA: ['Belém'], PB: ['João Pessoa'], PE: ['Recife'], PI: ['Teresina'],
+    PR: ['Curitiba'], RJ: ['Rio de Janeiro'], RN: ['Natal'], RO: ['Porto Velho'], RR: ['Boa Vista'],
+    RS: ['Porto Alegre'], SC: ['Florianópolis', 'São José'], SE: ['Aracaju'], SP: ['São Paulo'], TO: ['Palmas']
+};
+const semAcento = t => (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const ufDe = m => m.uf || ((m.nome.match(/\(([A-Z]{2})\)\s*$/) || [])[1]) || '';
+const ehCapital = m => (CAPITAIS[ufDe(m)] || []).some(c => semAcento(m.nome).includes(semAcento(c)));
+// [{ regiao, estados: [{ uf, mercados: [m] }] }]; praças sem UF conhecida ficam em "Outros", no fim
+function mercadosPorRegiao() {
+    const porUf = {};
+    dados.mercados.forEach(m => (porUf[ufDe(m)] = porUf[ufDe(m)] || []).push(m));
+    const ordenar = ms => ms.slice().sort((a, b) => (ehCapital(b) - ehCapital(a)) || nomeCurto(a).localeCompare(nomeCurto(b), 'pt'));
+    const usadas = new Set(), out = [];
+    for (const [regiao, ufs] of REGIOES) {
+        const estados = ufs.filter(uf => porUf[uf]).map(uf => (usadas.add(uf), { uf, mercados: ordenar(porUf[uf]) }));
+        if (estados.length) out.push({ regiao, estados });
+    }
+    const resto = dados.mercados.filter(m => !usadas.has(ufDe(m)));
+    if (resto.length) out.push({ regiao: 'Outros', estados: [{ uf: '', mercados: ordenar(resto) }] });
+    return out;
+}
+
 function montarMercados() {
+    const linha = m => `
+            <label class="flex items-center gap-2.5 pl-5 pr-3 py-2 rounded-lg hover:bg-mata-800 cursor-pointer text-sm text-slate-200">
+                <input type="checkbox" value="${esc(m.id)}" onchange="marcarMercado(this)" class="w-4 h-4 accent-[#FFDF00] shrink-0">
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${corMercado(m.id)}"></span>
+                <span class="truncate">${esc(ufDe(m) ? nomeCurto(m).replace(/\s*\([A-Z]{2}\)\s*$/, '') : nomeCurto(m))}</span>${ehCapital(m) ? '<span class="ml-auto text-[10px] font-semibold text-ouro ico-campo uppercase shrink-0">capital</span>' : ''}
+            </label>`;
     el('pop-mercados').innerHTML = `
-        <p class="px-3 pt-2 pb-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Locais (marque um ou mais)</p>
-        ${dados.mercados.map(m => `
-        <label class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-mata-800 cursor-pointer text-sm text-slate-200">
-            <input type="checkbox" value="${esc(m.id)}" onchange="marcarMercado(this)" class="w-4 h-4 accent-[#FFDF00] shrink-0">
-            <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${corMercado(m.id)}"></span>
-            <span class="truncate">${esc(m.nome)}</span>
-        </label>`).join('')}
+        <div class="flex items-center justify-between gap-2 px-3 pt-2 pb-1">
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Locais</p>
+            <div class="flex gap-1.5">
+                <button type="button" onclick="marcarTodosMercados(true)" class="text-[11px] font-semibold px-2 py-1 rounded-md bg-mata-800 hover:bg-mata-700 text-slate-200">Marcar todos</button>
+                <button type="button" onclick="marcarTodosMercados(false)" class="text-[11px] font-semibold px-2 py-1 rounded-md bg-mata-800 hover:bg-mata-700 text-slate-200">Desmarcar todos</button>
+            </div>
+        </div>
+        <p id="aviso-mercados" class="hidden px-3 pb-1 text-[11px] font-semibold text-rose-400">Marque pelo menos um local.</p>
+        <div class="max-h-[60vh] overflow-y-auto">
+        ${mercadosPorRegiao().map(r => `
+            <p class="px-3 pt-2.5 pb-0.5 text-xs font-bold text-verde-claro uppercase tracking-wide">${esc(r.regiao)}</p>
+            ${r.estados.map(e => `${e.uf ? `<p class="px-3 pt-1 text-[11px] font-semibold text-slate-400">${esc(e.uf)}</p>` : ''}${e.mercados.map(linha).join('')}`).join('')}`).join('')}
+        </div>
         <button onclick="fecharMercados()" class="w-full mt-1 bg-ouro text-mata-950 font-bold rounded-lg py-2 text-sm">Pronto</button>`;
 }
 function atualizarBotaoMercados() {
@@ -94,15 +140,31 @@ function abrirMercados(ev) {
     atualizarBotaoMercados();
     el('pop-mercados').classList.toggle('hidden');
 }
-function fecharMercados() { el('pop-mercados').classList.add('hidden'); }
-function marcarMercado(cx) {
-    const id = cx.value;
-    const novo = cx.checked ? [...mercadosSel, id] : mercadosSel.filter(x => x !== id);
-    if (!novo.length) { cx.checked = true; return; }   // pelo menos um local
-    mercadosSel = dados.mercados.map(m => m.id).filter(x => novo.includes(x));
+// "Desmarcar todos" deixa a lista vazia enquanto o quadro está aberto, para escolher do zero;
+// se fechar sem marcar nenhum, volta a seleção anterior
+let mercadosAntes = null;
+function fecharMercados() {
+    el('pop-mercados').classList.add('hidden');
+    if (!mercadosSel.length) aplicarMercados(mercadosAntes && mercadosAntes.length ? mercadosAntes : [dados.mercados[0].id]);
+    mercadosAntes = null;
+}
+function aplicarMercados(ids) {
+    mercadosSel = dados.mercados.map(m => m.id).filter(x => ids.includes(x));
+    const aviso = el('aviso-mercados');
+    if (aviso) aviso.classList.toggle('hidden', mercadosSel.length > 0);
+    if (!mercadosSel.length) { el('pop-mercados').querySelectorAll('input').forEach(c => { c.checked = false; }); return; }
     salvarPrefs();
     atualizarBotaoMercados();
     renderizarGrid();
+}
+function marcarTodosMercados(marcar) {
+    if (!marcar && mercadosSel.length) mercadosAntes = mercadosSel.slice();
+    aplicarMercados(marcar ? dados.mercados.map(m => m.id) : []);
+}
+function marcarMercado(cx) {
+    const id = cx.value;
+    if (!cx.checked && mercadosSel.length === 1 && mercadosSel[0] === id) mercadosAntes = mercadosSel.slice();
+    aplicarMercados(cx.checked ? [...mercadosSel, id] : mercadosSel.filter(x => x !== id));
 }
 document.addEventListener('click', (e) => {
     const p = el('pop-mercados');
