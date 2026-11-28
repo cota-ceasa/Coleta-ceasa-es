@@ -3,6 +3,9 @@
  * preço diário (1 e 3 meses) ou média semanal (1 ano). Mesmos períodos do detalhe (até 1 ano);
  * mais que isso, só sob consulta.
  * Abaixo, um quadro por praça com média, menor, maior e última cotação do período.
+ * Item cotado numa praça só: avisa e oferece comparar com produtos semelhantes (mesmo produto e
+ * mesma unidade de preço, de qualquer tipo/classificação) nas outras praças. Nesse modo, cada outra
+ * praça vira uma linha com a média diária de todos os tipos semelhantes dela.
  */
 const COMP = {
     MAX: 5,
@@ -10,6 +13,34 @@ const COMP = {
 };
 
 const pracasDoItem = (it) => dados.mercados.map(m => m.id).filter(id => it.m[id]);
+const normNome = (t) => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+
+// Semelhantes do item (que está numa praça só): { praça: [itens] } nas outras praças,
+// com o mesmo nome de produto e a mesma unidade de preço (tipos e classificações diferentes entram juntos)
+function semelhantesDoItem(it, origem) {
+    const nome = normNome(it.p), grupos = {};
+    for (const x of dados.itens) {
+        if (x === it || x.u !== it.u || normNome(x.p) !== nome) continue;
+        for (const id of Object.keys(x.m)) if (id !== origem) (grupos[id] = grupos[id] || []).push(x);
+    }
+    return grupos;
+}
+// média diária do preço comum de vários itens numa praça
+function serieGrupo(itens, id) {
+    const acc = new Map();
+    for (const x of itens) for (const { d, v } of serie(x, id)) {
+        const a = acc.get(d) || [0, 0];
+        a[0] += v; a[1]++;
+        acc.set(d, a);
+    }
+    return [...acc.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([d, [s, n]]) => ({ d, v: s / n }));
+}
+// série de uma praça na comparação: o próprio item ou, no modo semelhantes, o grupo daquela praça
+function serieComp(c, it, id) {
+    if (!c.sim || id === c.sim.origem) return serie(it, id);
+    return c.sim.cache[id] || (c.sim.cache[id] = serieGrupo(c.sim.grupos[id], id));
+}
+const pracasComp = (c, it) => c.sim ? c.sim.ids : pracasDoItem(it);
 
 // segunda-feira da semana de uma data ISO
 function inicioSemanaISO(d) {
@@ -33,7 +64,7 @@ function abrirComparar() {
     const it = itemPorChave(det.key), todas = pracasDoItem(it);
     let ids = det.mercs.filter(id => todas.includes(id)).slice(0, COMP.MAX);
     if (ids.length < 2) ids = [...new Set([...ids, ...todas])].slice(0, COMP.MAX);
-    det.comp = { ids, dias: (PERIODOS.find(p => p.dias === periodoDias) || PERIODOS[0]).dias, aviso: '' };
+    det.comp = { ids, dias: (PERIODOS.find(p => p.dias === periodoDias) || PERIODOS[0]).dias, aviso: '', unica: todas.length < 2 };
     Graf.zoomH = null;
     history.pushState({ det: det.key, comp: true }, '');
     renderComparar();
@@ -62,6 +93,40 @@ function alternarPracaComp(id) {
     Graf.zoomH = null;
     renderComparar();
 }
+// item numa praça só: troca o aviso pela comparação com os semelhantes das outras praças
+function compararSemelhantes() {
+    const c = det.comp, it = itemPorChave(det.key), origem = pracasDoItem(it)[0];
+    const grupos = semelhantesDoItem(it, origem);
+    const ids = dados.mercados.map(m => m.id).filter(id => id === origem || grupos[id]);
+    c.sim = { origem, grupos, ids, cache: {} };
+    c.ids = ids.slice(0, COMP.MAX);
+    c.unica = false;
+    c.aviso = '';
+    Graf.zoomH = null;
+    renderComparar();
+    window.scrollTo(0, 0);
+}
+function renderUnica(it) {
+    const origem = pracasDoItem(it)[0], grupos = semelhantesDoItem(it, origem), outras = Object.keys(grupos);
+    const detalhe = it.d.replace(/\bLonga Vida\b/g, 'LV');
+    const nome = `${it.p}${detalhe ? ' ' + detalhe : ''}`;
+    el('vista-detalhe').innerHTML = `
+        <div class="flex items-center justify-between">
+            <button data-act="voltar" class="text-slate-200 hover:text-white font-semibold py-2 pr-3 -ml-1"><i class="fa-solid fa-arrow-left mr-1.5"></i>Voltar</button>
+        </div>
+        <div class="bg-mata-900 border border-mata-800 rounded-2xl p-5 space-y-4">
+            <p class="text-xs font-bold text-verde-claro uppercase tracking-wide"><i class="fa-solid fa-scale-balanced mr-1"></i>Comparação entre praças</p>
+            <p class="text-white text-lg leading-snug">O produto <b>${esc(nome)}</b>, com esse nome, só tem cotação em <b>${esc(nomeCurto(mercadoPor(origem)))}</b>.</p>
+            ${outras.length ? `
+                <p class="text-slate-300">Gostaria de comparar com produtos semelhantes em outras praças? Encontramos <b>${esc(it.p)}</b> em ${outras.length} outra${outras.length > 1 ? 's' : ''} praça${outras.length > 1 ? 's' : ''} (${outras.join(', ')}). Os diferentes tipos de cada praça entram juntos, pela média.</p>
+                <div class="flex gap-2">
+                    <button data-act="comp-sim" class="flex-1 bg-ouro hover:brightness-95 text-black font-bold rounded-2xl py-3 transition">Sim, comparar</button>
+                    <button data-act="voltar" class="flex-1 bg-mata-800 hover:bg-mata-700 text-white font-semibold rounded-2xl py-3 transition-colors">Não</button>
+                </div>`
+            : `<p class="text-slate-300">Também não encontramos produtos semelhantes (${esc(it.p)}, ${UNIDADE[it.u]}) em outras praças.</p>`}
+        </div>`;
+}
+
 function periodoComp(dias) {
     det.comp.dias = +dias;
     det.comp.aviso = '';
@@ -71,12 +136,14 @@ function periodoComp(dias) {
 
 function renderComparar() {
     const y = window.scrollY;
-    const c = det.comp, it = itemPorChave(det.key), todas = pracasDoItem(it);
-    const fim = c.ids.map(id => { const p = serie(it, id); return p[p.length - 1].d; }).sort().pop();
+    const c = det.comp, it = itemPorChave(det.key);
+    if (c.unica) { renderUnica(it); return window.scrollTo(0, y); }
+    const todas = pracasComp(c, it);
+    const fim = c.ids.map(id => { const p = serieComp(c, it, id); return p.length ? p[p.length - 1].d : ''; }).sort().pop();
     const ini = somarDias(fim, -c.dias);
     const semanal = c.dias > 91;   // 1 ano: média semanal; 1 e 3 meses: cada cotação
     const series = c.ids.map(id => {
-        const bruto = serie(it, id).filter(p => p.d >= ini);
+        const bruto = serieComp(c, it, id).filter(p => p.d >= ini);
         return { id, cor: corMercado(id), bruto, pts: semanal ? agregarComp(bruto, false) : bruto };
     }).filter(s => s.pts.length);
     // rótulo do dia no gráfico: "Semana de dd/mm/aaaa" na média semanal; data normal nos demais
@@ -103,6 +170,11 @@ function renderComparar() {
             <h2 class="text-2xl font-bold text-white leading-tight mt-1">${esc(it.p)}${detalhe ? ` <span class="font-semibold text-slate-300">${esc(detalhe)}</span>` : ''}</h2>
             <p class="text-sm text-slate-400 mt-1">${esc(sub)} · preço comum</p>
         </div>
+        ${c.sim ? `<div class="flex items-start gap-2 rounded-xl border border-ouro/40 bg-ouro/10 px-3 py-2.5 text-xs text-slate-200 leading-snug" role="note">
+            <i class="fa-solid fa-circle-info text-ouro mt-0.5"></i>
+            <div><p><b>Produtos semelhantes.</b> ${c.sim.origem}: o próprio item. Nas outras praças, média dos tipos encontrados:</p>
+            <ul class="mt-1 space-y-0.5">${c.ids.filter(id => id !== c.sim.origem).map(id => `<li><b>${id}:</b> ${c.sim.grupos[id].map(x => esc([x.d || 'sem tipo', x.e !== 'kg' ? x.e : ''].filter(Boolean).join(' '))).join(' · ')}</li>`).join('')}</ul></div>
+        </div>` : ''}
 
         <div>
             <div class="flex flex-wrap gap-1.5 bg-mata-900 border border-mata-800 rounded-2xl p-1.5" role="group" aria-label="Praças comparadas">
