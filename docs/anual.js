@@ -178,8 +178,8 @@ function renderAnual() {
         </div>
 
         <div>
-            <p class="text-xs font-bold text-ouro uppercase tracking-wide"><i class="fa-solid fa-chart-line mr-1"></i>Análise anualizada e previsão</p>
-            <h2 class="text-2xl font-bold text-white leading-tight mt-1">${esc(it.p)}${detalhe ? ` <span class="font-semibold text-slate-300">${esc(detalhe)}</span>` : ''}</h2>
+            <span class="inline-flex items-center gap-1.5 bg-ouro text-black text-xs font-bold uppercase tracking-wide rounded-xl px-3 py-1.5 shadow-[0_2px_0_#9A7D00] select-none"><i class="fa-solid fa-chart-line"></i>Análise anualizada e previsão</span>
+            <h2 class="text-2xl font-bold text-white leading-tight mt-2">${esc(it.p)}${detalhe ? ` <span class="font-semibold text-slate-300">${esc(detalhe)}</span>` : ''}</h2>
             <p class="text-sm text-slate-400 mt-1">${esc(sub)} · ${esc(nomeCurto(merc))}</p>
         </div>
 
