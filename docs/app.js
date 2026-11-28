@@ -338,7 +338,7 @@ function voltar() {
 }
 window.addEventListener('popstate', () => {
     if (!det) return;
-    if (det.anual) fecharAnual(); else fecharDetalhe();   // análise anual -> volta ao detalhe
+    if (det.anual) fecharAnual(); else if (det.comp) fecharComparar(); else fecharDetalhe();   // análise/comparação -> volta ao detalhe
 });
 
 // Botões de praça do detalhe: marcar/desmarcar para incluir no gráfico de comparação
@@ -361,6 +361,8 @@ function botoesPeriodo(pers, per) {
 }
 
 function renderDetalhe() {
+    if (det.comp) return renderComparar();   // zoom do gráfico na comparação redesenha por aqui
+    Graf.fmtCurta = Graf.fmtLonga = null;
     if (det.mercs.length > 1) return renderDetalheMulti();
     const y = window.scrollY;
     const it = itemPorChave(det.key), mid = det.mercs[0], m = it.m[mid], merc = mercadoPor(mid);
@@ -414,7 +416,8 @@ function renderDetalhe() {
                 <tr class="border-t border-mata-800"><td class="py-2.5 text-slate-300">Mín. – Máx. do dia</td><td class="text-right font-bold text-white">${preco(m.min)} – ${preco(m.max)}</td></tr>
             </table>
         </div>
-        <button data-act="anual" class="w-full bg-ouro hover:brightness-95 text-black font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 shadow-sm transition"><i class="fa-solid fa-chart-line"></i>Análise anualizada e previsão de preços</button>`;
+        <button data-act="anual" class="w-full bg-ouro hover:brightness-95 text-black font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 shadow-sm transition"><i class="fa-solid fa-chart-line"></i>Análise anualizada e previsão de preços</button>
+        ${pracasDoItem(it).length > 1 ? `<button data-act="comp" class="w-full bg-mata-900 border border-mata-700 hover:bg-mata-800 text-white font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 transition-colors"><i class="fa-solid fa-scale-balanced text-verde-claro"></i>Comparar praças no histórico</button>` : ''}`;
     window.scrollTo(0, y);
 }
 
@@ -484,7 +487,8 @@ function renderDetalheMulti() {
                 ${linha('Mín. – Máx. do dia', id => `${preco(it.m[id].min)}–${preco(it.m[id].max)}`)}
             </table>
         </div>
-        <button data-act="anual" class="w-full bg-ouro hover:brightness-95 text-black font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 shadow-sm transition"><i class="fa-solid fa-chart-line"></i>Análise anualizada e previsão de preços</button>`;
+        <button data-act="anual" class="w-full bg-ouro hover:brightness-95 text-black font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 shadow-sm transition"><i class="fa-solid fa-chart-line"></i>Análise anualizada e previsão de preços</button>
+        ${pracasDoItem(it).length > 1 ? `<button data-act="comp" class="w-full bg-mata-900 border border-mata-700 hover:bg-mata-800 text-white font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 transition-colors"><i class="fa-solid fa-scale-balanced text-verde-claro"></i>Comparar praças no histórico</button>` : ''}`;
     window.scrollTo(0, y);
 }
 
@@ -559,6 +563,9 @@ document.addEventListener('click', (e) => {
         case 'voltar': voltar(); break;
         case 'merc': Graf.zoomH = null; alternarPracaDetalhe(arg); break;
         case 'anual': abrirAnual(); break;
+        case 'comp': abrirComparar(); break;
+        case 'comp-merc': alternarPracaComp(arg); break;
+        case 'comp-per': periodoComp(arg); break;
         case 'anual-merc': det.anual.mid = arg; ANUAL.zoom = null; renderAnual(); break;
         case 'anual-ano': alternarAnoAnual(arg); break;
         case 'mais': abrirFolha(`
