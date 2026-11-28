@@ -1,0 +1,42 @@
+name: Publicar só o app (sem coletar)
+
+# Publica mudanças da interface (docs/) sem acessar o banco: reaproveita o dados.json que já está
+# no ar. Útil quando a coleta está pausada ou para ver uma mudança visual na hora.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: coleta          # não publica ao mesmo tempo que uma coleta
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Usar os dados que já estão publicados
+        run: |
+          curl -fsSL --retry 3 "https://cota-ceasa.github.io/Coleta-ceasa-es/dados.json?t=$(date +%s)" -o /tmp/dados.json
+          python3 -c "import json; d = json.load(open('/tmp/dados.json')); assert d['itens'] and d['mercados']; print(len(d['itens']), 'itens,', len(d['mercados']), 'mercados, gerado em', d.get('gerado_em'))"
+          cp /tmp/dados.json docs/dados.json
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - run: sleep 15
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
